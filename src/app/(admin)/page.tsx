@@ -1,12 +1,5 @@
-import type { Metadata } from "next";
-import CampaignWorkspace from "@/components/campaigns/CampaignWorkspace";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Campaign Studio | Real Estate Outreach",
-  description:
-    "Create AI-assisted real-estate campaigns and prepare contact outreach.",
-};
-
-export default function CampaignStudioPage() {
-  return <CampaignWorkspace />;
+export default function HomePage() {
+  redirect("/campaigns");
 }

@@ -51,7 +51,12 @@ const navItems: NavItem[] = [
   {
     icon: <ShootingStarIcon />,
     name: "Campaign Studio",
-    path: "/",
+    subItems: [
+      { name: "Campaigns", path: "/campaigns", pro: false },
+      { name: "Contacts", path: "/contacts", pro: false },
+      { name: "Leads", path: "/leads", pro: false },
+      { name: "Properties", path: "/properties", pro: false },
+    ],
   },
   {
     icon: <CalenderIcon />,
@@ -363,7 +368,7 @@ const AppSidebar: React.FC = () => {
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
         }`}
       >
-        <Link href="/">
+        <Link href="/campaigns">
           <span className="flex items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white">
               <GridIcon className="h-5 w-5" />
