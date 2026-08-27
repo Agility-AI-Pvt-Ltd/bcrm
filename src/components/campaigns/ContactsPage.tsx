@@ -12,8 +12,11 @@ import {
   dropDatasetDuplicates,
   getContactStats,
   getDatasetDuplicateReport,
+  importDatasetToCrm,
   inspectGoogleSheet,
+  undoImportDatasetToCrm,
   listContactDatasets,
+  listContacts,
   previewDatasetMerge,
   type AvailableColumn,
   type ContactDataset,
@@ -25,7 +28,13 @@ import {
   type DatasetMergePreview,
   type GoogleWorksheetInfo,
   type MatchingDatasetPreview,
+  type OperationReport,
+  type StoredContact,
+  CRM_CONTACT_COLUMNS,
+  formatContactCell,
 } from "@/lib/contactIntelligence";
+
+const CONTACTS_PAGE_SIZE = 15;
 
 function GoogleSheetsIcon() {
   return (
@@ -47,6 +56,239 @@ function GoogleSheetsIcon() {
 
 type SourceMode = "csv" | "sheet";
 type MergeMode = "create_new" | "merge";
+
+function formatDatasetDisplayName(dataset: {
+  name: string;
+  source_type: string;
+  source_file?: string | null;
+  created_at?: string;
+}) {
+  const raw = (dataset.name || "").trim();
+  const looksBroken =
+    !raw ||
+    /^edit\?/i.test(raw) ||
+    raw.toLowerCase().startsWith("edit?") ||
+    /usp=sharing/i.test(raw) ||
+    raw.includes("docs.google.com");
+
+  if (!looksBroken) return raw;
+
+  const when = dataset.created_at
+    ? new Date(dataset.created_at).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "";
+  const prefix =
+    dataset.source_type === "google_sheet" ||
+    dataset.source_file?.includes("docs.google.com/spreadsheets")
+      ? "Google Sheet import"
+      : dataset.source_type === "csv"
+        ? "CSV import"
+        : "Imported table";
+  return when ? `${prefix} · ${when}` : prefix;
+}
+
+function shortSourceLabel(source: string) {
+  if (!source) return "";
+  if (source.includes("docs.google.com/spreadsheets")) {
+    const match = source.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    return match ? `Google Sheet · ${match[1].slice(0, 10)}…` : "Google Sheet";
+  }
+  const file = source.split("/").pop() || source;
+  return file.length > 48 ? `${file.slice(0, 45)}…` : file;
+}
+
+function reportTone(status: string | undefined) {
+  if (status === "success") {
+    return {
+      border: "border-success-200 dark:border-success-500/30",
+      bg: "bg-success-50/50 dark:bg-success-500/10",
+      badge: "success" as const,
+      label: "Success",
+    };
+  }
+  if (status === "failure") {
+    return {
+      border: "border-error-200 dark:border-error-500/30",
+      bg: "bg-error-50/50 dark:bg-error-500/10",
+      badge: "error" as const,
+      label: "Failure",
+    };
+  }
+  return {
+    border: "border-warning-200 dark:border-warning-500/30",
+    bg: "bg-warning-50/40 dark:bg-warning-500/10",
+    badge: "warning" as const,
+    label: "Partial",
+  };
+}
+
+function OperationReportCard({
+  report,
+  storeResult,
+}: {
+  report: OperationReport;
+  storeResult?: ContactDatasetWriteResult | null;
+}) {
+  const tone = reportTone(report.status);
+  const source = report.metadata?.source;
+  const llm = report.metadata?.llm;
+  const effects = report.metadata?.effects;
+  const sheets = source?.worksheets_selected || [];
+
+  return (
+    <section
+      className={`rounded-2xl border p-5 ${tone.border} ${tone.bg}`}
+    >
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+            Analysis report
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white/90">
+            LLM result
+          </h2>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge color={tone.badge} size="sm">
+            {tone.label}
+          </Badge>
+          {report.message_source ? (
+            <Badge color="light" size="sm">
+              {report.message_source === "llm" ? "LLM message" : "System message"}
+            </Badge>
+          ) : null}
+        </div>
+      </div>
+
+      <p className="text-sm leading-relaxed text-gray-800 dark:text-gray-200">
+        {report.message}
+      </p>
+
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <MetaItem
+          label="Source"
+          value={
+            source?.type === "google_sheet"
+              ? "Google Spreadsheet"
+              : source?.type === "csv"
+                ? "CSV file"
+                : source?.type || "—"
+          }
+        />
+        <MetaItem
+          label="Worksheets chosen"
+          value={
+            source?.all_worksheets || source?.select_all_requested
+              ? `All (${source?.worksheet_count ?? sheets.length})`
+              : sheets.length
+                ? sheets.join(", ")
+                : "—"
+          }
+        />
+        <MetaItem label="Final rows loaded" value={String(effects?.source_rows ?? 0)} />
+        <MetaItem label="Columns found" value={String(effects?.source_columns ?? 0)} />
+        <MetaItem
+          label="Importable contacts"
+          value={String(effects?.importable_count ?? 0)}
+        />
+        <MetaItem
+          label="Duplicates detected"
+          value={String(effects?.duplicate_contacts ?? 0)}
+        />
+        <MetaItem
+          label="Valid phones / emails"
+          value={`${effects?.valid_phone_numbers ?? 0} / ${effects?.valid_emails ?? 0}`}
+        />
+        <MetaItem
+          label="Mappings accepted / review / needs you"
+          value={`${effects?.accepted_mappings ?? 0} / ${effects?.review_mappings ?? 0} / ${effects?.needs_user_decisions ?? 0}`}
+        />
+        <MetaItem
+          label="LLM mapping"
+          value={
+            llm?.used
+              ? `Succeeded (${llm.provider || "provider"})`
+              : `Not used (${llm?.reason || "n/a"})`
+          }
+        />
+      </div>
+
+      {storeResult ? (
+        <div className="mt-5 rounded-xl border border-gray-200 bg-white/70 p-4 dark:border-gray-700 dark:bg-gray-900/40">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            Store effects
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <MetaItem
+              label="Action"
+              value={storeResult.action === "merged" ? "Merged into table" : "Created new table"}
+            />
+            <MetaItem label="Table" value={storeResult.dataset.name} />
+            <MetaItem label="Rows added" value={String(storeResult.rows_added)} />
+            <MetaItem
+              label="Table row count"
+              value={String(storeResult.dataset.row_count)}
+            />
+            <MetaItem
+              label="Columns selected"
+              value={String(storeResult.dataset.selected_columns.length)}
+            />
+            <MetaItem
+              label="Columns added"
+              value={
+                storeResult.columns_added.length
+                  ? storeResult.columns_added.join(", ")
+                  : "None"
+              }
+            />
+            <MetaItem
+              label="Unmapped skipped"
+              value={
+                storeResult.unmapped_columns_skipped.length
+                  ? storeResult.unmapped_columns_skipped.join(", ")
+                  : "None"
+              }
+            />
+            <MetaItem
+              label="CRM contacts created"
+              value={
+                storeResult.also_imported_to_contacts
+                  ? String(storeResult.contacts_created)
+                  : "Not requested"
+              }
+            />
+            <MetaItem
+              label="Duplicate warning"
+              value={
+                storeResult.duplicates.has_duplicates
+                  ? `${storeResult.duplicates.duplicate_count} found`
+                  : "None"
+              }
+            />
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function MetaItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-gray-200/80 bg-white/60 px-3 py-2 dark:border-gray-700 dark:bg-gray-900/30">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-gray-500">
+        {label}
+      </p>
+      <p className="mt-1 break-words text-sm font-medium text-gray-900 dark:text-white/90">
+        {value}
+      </p>
+    </div>
+  );
+}
 
 export default function ContactsPage() {
   const [csvPayload, setCsvPayload] = useState<string | null>(null);
@@ -75,6 +317,8 @@ export default function ContactsPage() {
   const [alsoImportToContacts, setAlsoImportToContacts] = useState(false);
   const [writeResult, setWriteResult] = useState<ContactDatasetWriteResult | null>(null);
   const [droppingDuplicates, setDroppingDuplicates] = useState(false);
+  const [importingToCrmId, setImportingToCrmId] = useState<string | null>(null);
+  const [undoingCrmId, setUndoingCrmId] = useState<string | null>(null);
   const [createdDataset, setCreatedDataset] = useState<ContactDataset | null>(null);
   const [datasets, setDatasets] = useState<ContactDatasetSummary[]>([]);
   const [duplicateReport, setDuplicateReport] = useState<DatasetDuplicateReport | null>(
@@ -82,6 +326,11 @@ export default function ContactsPage() {
   );
   const [stats, setStats] = useState<ContactStats | null>(null);
   const [droppingDatasetId, setDroppingDatasetId] = useState<string | null>(null);
+  const [showContacts, setShowContacts] = useState(false);
+  const [contacts, setContacts] = useState<StoredContact[]>([]);
+  const [contactsPage, setContactsPage] = useState(1);
+  const [contactsTotal, setContactsTotal] = useState(0);
+  const [loadingContacts, setLoadingContacts] = useState(false);
 
   const plan = analysis?.import_plan;
   const availableColumns: AvailableColumn[] = useMemo(() => {
@@ -121,6 +370,30 @@ export default function ContactsPage() {
       setLoadingList(false);
     }
   }, []);
+
+  const loadContactsPage = useCallback(async (page: number) => {
+    setLoadingContacts(true);
+    try {
+      const result = await listContacts(page, CONTACTS_PAGE_SIZE);
+      setContacts(result.items);
+      setContactsTotal(result.total);
+      setContactsPage(result.page);
+    } catch (error) {
+      setNotice(
+        error instanceof ApiError ? error.message : "Could not load contacts.",
+      );
+    } finally {
+      setLoadingContacts(false);
+    }
+  }, []);
+
+  const openContactsView = async () => {
+    const next = !showContacts;
+    setShowContacts(next);
+    if (next) {
+      await loadContactsPage(1);
+    }
+  };
 
   useEffect(() => {
     void refreshLists();
@@ -264,6 +537,7 @@ export default function ContactsPage() {
       }
 
       setAnalysis(result);
+      setWriteResult(null);
       const columns = result.import_plan.available_columns?.length
         ? result.import_plan.available_columns
         : Object.values(result.inferred_mapping || {}).map((item) => ({
@@ -275,12 +549,15 @@ export default function ContactsPage() {
         .filter((column) => column.suggested)
         .map((column) => column.name);
       setSelectedColumns(suggested.length ? suggested : columns.map((column) => column.name));
+      const report = result.operation_report;
       setNotice(
-        source === "sheet"
-          ? "Google Sheet analyzed with LLM metadata mapping. Choose columns to store."
-          : "CSV analyzed with LLM metadata mapping. Choose columns to store — raw rows stay hidden.",
+        report?.message ||
+          (source === "sheet"
+            ? "Google Sheet analyzed. Review the report and choose columns to store."
+            : "CSV analyzed. Review the report and choose columns to store."),
       );
     } catch (error) {
+      setAnalysis(null);
       setNotice(error instanceof ApiError ? error.message : "Analysis failed.");
     } finally {
       setAnalyzing(false);
@@ -419,6 +696,42 @@ export default function ContactsPage() {
     setNotice("Duplicates kept in the table. You can drop them later from this warning.");
   };
 
+  const moveTableToCrm = async (datasetId: string) => {
+    setImportingToCrmId(datasetId);
+    try {
+      const result = await importDatasetToCrm(datasetId);
+      setNotice(result.message);
+      await refreshLists();
+      if (showContacts) {
+        await loadContactsPage(contactsPage);
+      }
+    } catch (error) {
+      setNotice(
+        error instanceof ApiError ? error.message : "Could not move table contacts to CRM.",
+      );
+    } finally {
+      setImportingToCrmId(null);
+    }
+  };
+
+  const undoMoveTableToCrm = async (datasetId: string) => {
+    setUndoingCrmId(datasetId);
+    try {
+      const result = await undoImportDatasetToCrm(datasetId);
+      setNotice(result.message);
+      await refreshLists();
+      if (showContacts) {
+        await loadContactsPage(contactsPage);
+      }
+    } catch (error) {
+      setNotice(
+        error instanceof ApiError ? error.message : "Could not undo CRM move.",
+      );
+    } finally {
+      setUndoingCrmId(null);
+    }
+  };
+
   const dropDuplicates = async (datasetId?: string) => {
     const id = datasetId || createdDataset?.id;
     if (!id) {
@@ -464,8 +777,6 @@ export default function ContactsPage() {
     <div>
       <PageBreadcrumb pageTitle="Contacts" />
 
-      <ContactsAssistantChat />
-
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="mb-1 text-sm font-medium text-brand-500">Contact Intelligence</p>
@@ -477,10 +788,119 @@ export default function ContactsPage() {
             columns, optionally add to CRM contacts, and get duplicate warnings after save.
           </p>
         </div>
-        <Badge color="info" size="sm">
-          Analyze · Select · Merge/Create
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void openContactsView()}
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+          >
+            {showContacts ? "Hide contacts" : "View contacts"}
+          </button>
+          <Badge color="info" size="sm">
+            Analyze · Select · Merge/Create
+          </Badge>
+        </div>
       </div>
+
+      {showContacts && (
+        <section className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="flex flex-col gap-2 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
+            <div>
+              <h2 className="font-semibold text-gray-900 dark:text-white/90">
+                All contacts
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Showing {contacts.length ? (contactsPage - 1) * CONTACTS_PAGE_SIZE + 1 : 0}
+                –
+                {Math.min(contactsPage * CONTACTS_PAGE_SIZE, contactsTotal)} of{" "}
+                {contactsTotal}
+                {" · "}
+                {CRM_CONTACT_COLUMNS.length} columns (empty cells show —)
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={loadingContacts || contactsPage <= 1}
+                onClick={() => void loadContactsPage(contactsPage - 1)}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 dark:border-gray-700 dark:text-gray-300"
+              >
+                Previous
+              </button>
+              <span className="text-xs text-gray-500">
+                Page {contactsPage} /{" "}
+                {Math.max(1, Math.ceil(contactsTotal / CONTACTS_PAGE_SIZE))}
+              </span>
+              <button
+                type="button"
+                disabled={
+                  loadingContacts ||
+                  contactsPage * CONTACTS_PAGE_SIZE >= contactsTotal
+                }
+                onClick={() => void loadContactsPage(contactsPage + 1)}
+                className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-max w-full text-left text-sm">
+              <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-white/[0.02]">
+                <tr>
+                  {CRM_CONTACT_COLUMNS.map((column) => (
+                    <th
+                      key={column.key}
+                      className="whitespace-nowrap px-4 py-3 font-medium"
+                    >
+                      {column.label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {loadingContacts ? (
+                  <tr>
+                    <td
+                      colSpan={CRM_CONTACT_COLUMNS.length}
+                      className="px-5 py-8 text-center text-gray-500"
+                    >
+                      Loading contacts…
+                    </td>
+                  </tr>
+                ) : contacts.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={CRM_CONTACT_COLUMNS.length}
+                      className="px-5 py-8 text-center text-gray-500"
+                    >
+                      No contacts yet. Columns stay available for NoBroker-style lead
+                      data once contacts are imported.
+                    </td>
+                  </tr>
+                ) : (
+                  contacts.map((contact) => (
+                    <tr key={contact.id}>
+                      {CRM_CONTACT_COLUMNS.map((column) => (
+                        <td
+                          key={column.key}
+                          className={`whitespace-nowrap px-4 py-3 text-gray-500 ${
+                            column.key === "name"
+                              ? "font-medium text-gray-800 dark:text-white/90"
+                              : ""
+                          }`}
+                        >
+                          {formatContactCell(contact, column.key)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
         {[
@@ -586,7 +1006,7 @@ export default function ContactsPage() {
                           </span>
                           <span className="mt-0.5 block text-xs text-gray-500">
                             {typeof sheet.row_count === "number"
-                              ? `${sheet.row_count} sample rows`
+                              ? `${sheet.row_count} data rows`
                               : `gid ${sheet.gid}`}
                           </span>
                         </span>
@@ -688,9 +1108,18 @@ export default function ContactsPage() {
               {analyzing ? "Analyzing with LLM…" : "Analyze with LLM"}
             </button>
           </section>
+
+          <ContactsAssistantChat />
         </div>
 
         <div className="col-span-12 space-y-6 xl:col-span-8">
+          {analysis?.operation_report ? (
+            <OperationReportCard
+              report={analysis.operation_report}
+              storeResult={writeResult}
+            />
+          ) : null}
+
           <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -1124,84 +1553,177 @@ export default function ContactsPage() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-            <div className="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
-              <h2 className="font-semibold text-gray-900 dark:text-white/90">
-                Saved tables
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                CRM contacts: {stats?.total ?? "—"} · Tables with duplicates:{" "}
-                {duplicateReport?.tables_with_duplicates ?? 0}
-              </p>
+          <section className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div className="flex flex-col gap-4 border-b border-gray-100 px-5 py-5 sm:flex-row sm:items-end sm:justify-between dark:border-gray-800">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white/90">
+                  Saved tables
+                </h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Imported sheets stay here until you move them into CRM contacts.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                  CRM contacts: {stats?.total ?? 0}
+                </span>
+                <span className="inline-flex items-center rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                  Tables: {datasets.length}
+                </span>
+                {(duplicateReport?.tables_with_duplicates ?? 0) > 0 ? (
+                  <span className="inline-flex items-center rounded-full bg-warning-50 px-3 py-1 text-xs font-medium text-warning-700 dark:bg-warning-500/15 dark:text-warning-300">
+                    Dup tables: {duplicateReport?.tables_with_duplicates}
+                  </span>
+                ) : null}
+              </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-white/[0.02]">
-                  <tr>
-                    <th className="px-5 py-3 font-medium">Name</th>
-                    <th className="px-5 py-3 font-medium">Columns</th>
-                    <th className="px-5 py-3 font-medium">Rows</th>
-                    <th className="px-5 py-3 font-medium">Duplicates</th>
-                    <th className="px-5 py-3 font-medium">Source</th>
-                    <th className="px-5 py-3 font-medium">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {loadingList ? (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-8 text-center text-gray-500">
-                        Loading tables…
-                      </td>
-                    </tr>
-                  ) : datasets.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-5 py-8 text-center text-gray-500">
-                        No tables yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    datasets.map((dataset) => (
-                      <tr key={dataset.id}>
-                        <td className="px-5 py-4 font-medium text-gray-800 dark:text-white/90">
-                          {dataset.name}
-                        </td>
-                        <td className="px-5 py-4 text-gray-500">
-                          {dataset.selected_columns.join(", ")}
-                        </td>
-                        <td className="px-5 py-4 text-gray-500">{dataset.row_count}</td>
-                        <td className="px-5 py-4">
-                          {dataset.has_duplicates ? (
-                            <Badge color="warning" size="sm">
-                              {dataset.duplicate_count}
+
+            <div className="space-y-4 p-5">
+              {loadingList ? (
+                <p className="py-8 text-center text-sm text-gray-500">Loading tables…</p>
+              ) : datasets.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-gray-300 px-4 py-10 text-center dark:border-gray-700">
+                  <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                    No saved tables yet
+                  </p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Analyze a Google Sheet or CSV, choose columns, then create a table.
+                  </p>
+                </div>
+              ) : (
+                datasets.map((dataset) => {
+                  const displayName = formatDatasetDisplayName(dataset);
+                  const sourceLabel =
+                    dataset.source_type === "google_sheet"
+                      ? "Google Sheet"
+                      : dataset.source_type === "csv"
+                        ? "CSV"
+                        : dataset.source_type;
+                  const isSheet =
+                    dataset.source_type === "google_sheet" ||
+                    Boolean(dataset.source_file?.includes("docs.google.com/spreadsheets"));
+
+                  return (
+                    <article
+                      key={dataset.id}
+                      className="rounded-2xl border border-gray-200 bg-gray-50/60 p-5 dark:border-gray-800 dark:bg-white/[0.02]"
+                    >
+                      <div className="flex flex-col gap-4 xl:flex-row xl:items-stretch xl:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold ${
+                                isSheet
+                                  ? "bg-[#E8F5E9] text-[#0F9D58]"
+                                  : "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-300"
+                              }`}
+                            >
+                              {isSheet ? "GS" : "CSV"}
+                            </span>
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white/90">
+                              {displayName}
+                            </h3>
+                            <Badge color="light" size="sm">
+                              {sourceLabel}
                             </Badge>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <span className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-700">
+                              {dataset.row_count} rows
+                            </span>
+                            <span className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-700">
+                              {dataset.selected_columns.length} columns
+                            </span>
+                            <span
+                              className={`rounded-md px-2.5 py-1 text-xs font-medium ring-1 ${
+                                dataset.has_duplicates
+                                  ? "bg-warning-50 text-warning-700 ring-warning-200 dark:bg-warning-500/15 dark:text-warning-300 dark:ring-warning-500/30"
+                                  : "bg-white text-gray-700 ring-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:ring-gray-700"
+                              }`}
+                            >
+                              {dataset.has_duplicates
+                                ? `${dataset.duplicate_count} duplicates`
+                                : "No duplicates"}
+                            </span>
+                          </div>
+
+                          <div className="mt-4">
+                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                              Columns
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {dataset.selected_columns.map((column) => (
+                                <span
+                                  key={column}
+                                  className="rounded-full bg-white px-2.5 py-1 text-xs text-gray-600 ring-1 ring-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:ring-gray-700"
+                                >
+                                  {column}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {dataset.source_file ? (
+                            <p className="mt-3 truncate text-xs text-gray-400" title={dataset.source_file}>
+                              Source: {shortSourceLabel(dataset.source_file)}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="flex shrink-0 flex-col justify-center gap-2 xl:w-56">
+                          <button
+                            type="button"
+                            disabled={
+                              importingToCrmId !== null ||
+                              undoingCrmId !== null ||
+                              dataset.row_count === 0
+                            }
+                            onClick={() => void moveTableToCrm(dataset.id)}
+                            className="inline-flex w-full items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                          >
+                            {importingToCrmId === dataset.id
+                              ? "Moving…"
+                              : "Move to CRM contacts"}
+                          </button>
+                          {dataset.can_undo_crm_import ? (
+                            <button
+                              type="button"
+                              disabled={undoingCrmId !== null || importingToCrmId !== null}
+                              onClick={() => void undoMoveTableToCrm(dataset.id)}
+                              className="inline-flex w-full items-center justify-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-white disabled:opacity-50 dark:border-gray-700 dark:text-gray-300"
+                            >
+                              {undoingCrmId === dataset.id
+                                ? "Undoing…"
+                                : `Undo CRM move${
+                                    dataset.crm_imported_count
+                                      ? ` (${dataset.crm_imported_count})`
+                                      : ""
+                                  }`}
+                            </button>
                           ) : (
-                            <span className="text-gray-500">0</span>
+                            <p className="text-center text-[11px] text-gray-400 xl:text-left">
+                              Adds name, phone, and email into CRM. Undo appears after a move.
+                            </p>
                           )}
-                        </td>
-                        <td className="px-5 py-4 text-gray-500">
-                          {dataset.source_file || dataset.source_type}
-                        </td>
-                        <td className="px-5 py-4">
                           {dataset.has_duplicates ? (
                             <button
                               type="button"
                               disabled={droppingDuplicates}
                               onClick={() => void dropDuplicates(dataset.id)}
-                              className="rounded-lg border border-warning-400 px-3 py-1.5 text-xs font-medium text-warning-700 hover:bg-warning-50 disabled:opacity-50 dark:text-warning-300"
+                              className="inline-flex w-full items-center justify-center rounded-lg border border-warning-400 px-4 py-2.5 text-sm font-medium text-warning-700 hover:bg-warning-50 disabled:opacity-50 dark:text-warning-300"
                             >
                               {droppingDatasetId === dataset.id
                                 ? "Dropping…"
                                 : "Drop duplicates"}
                             </button>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                          ) : null}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })
+              )}
             </div>
           </section>
         </div>

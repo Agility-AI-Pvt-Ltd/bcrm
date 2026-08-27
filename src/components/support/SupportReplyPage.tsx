@@ -6,7 +6,7 @@ const thread = [
     author: "John Doe",
     email: "jhondelin@gmail.com",
     time: "Mon, 3:20 PM (2 hrs ago)",
-    body: "I’m currently working on customizing the TailAdmin dashboard and would like to add a new section labeled “Reports.” Before I proceed, I wanted to check if there’s any official guide or best practice you recommend for adding custom pages within the TailAdmin structure.",
+    body: "I’m currently working on customizing the EstateAdmin dashboard and would like to add a new section labeled “Reports.” Before I proceed, I wanted to check if there’s any official guide or best practice you recommend for adding custom pages within the EstateAdmin structure.",
   },
   {
     author: "Musharof Chowdhury",

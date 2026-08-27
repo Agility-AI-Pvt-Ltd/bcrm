@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import PropertiesPage from "@/components/campaigns/PropertiesPage";
 
 export const metadata: Metadata = {
-  title: "Properties | RealtyReach",
+  title: "Properties | EstateFlow",
   description: "Manage property listings for real-estate campaigns.",
 };
 

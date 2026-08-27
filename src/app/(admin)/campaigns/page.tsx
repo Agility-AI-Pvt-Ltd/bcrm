@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import CampaignWorkspace from "@/components/campaigns/CampaignWorkspace";
 
 export const metadata: Metadata = {
-  title: "Campaigns | RealtyReach",
+  title: "Campaigns | EstateFlow",
   description:
     "Create AI-assisted real-estate campaigns and prepare contact outreach.",
 };

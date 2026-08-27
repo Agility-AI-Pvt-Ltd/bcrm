@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Blue, glasses avatar">
+  <circle cx="64" cy="64" r="64" fill="#1D4ED8"/>
+  <path d="M27 128 C27 103 43 87 64 87 C85 87 101 103 101 128 Z" fill="#F97316"/>
+  <rect x="56" y="70" width="16" height="21" rx="7" fill="#F8FAFC"/>
+  <circle cx="36" cy="56" r="7.5" fill="#F8FAFC"/>
+  <circle cx="92" cy="56" r="7.5" fill="#F8FAFC"/>
+  <ellipse cx="64" cy="55" rx="27" ry="24" fill="#F8FAFC"/>
+  <ellipse cx="53.5" cy="53" rx="6.4" ry="7.2" fill="#1F2937"/>
+  <circle cx="51.644" cy="50.552" r="2.2" fill="#FFFFFF"/>
+  <ellipse cx="74.5" cy="53" rx="6.4" ry="7.2" fill="#1F2937"/>
+  <circle cx="72.644" cy="50.552" r="2.2" fill="#FFFFFF"/>
+  <path d="M55 68 Q64 75.5 73 68" fill="none" stroke="#1F2937" stroke-width="3.6" stroke-linecap="round"/>
+  <rect x="41" y="42" width="23" height="22" rx="6" fill="none" stroke="#1F2937" stroke-width="3"/>
+  <rect x="65" y="42" width="23" height="22" rx="6" fill="none" stroke="#1F2937" stroke-width="3"/>
+  <path d="M64 52 L65 52" stroke="#1F2937" stroke-width="3"/>
+  <path d="M41 50 L34 52" stroke="#1F2937" stroke-width="3" stroke-linecap="round"/>
+  <path d="M88 50 L95 52" stroke="#1F2937" stroke-width="3" stroke-linecap="round"/>
+  <path d="M64 32 L64 14" stroke="#FDBA74" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="64" cy="11" r="7" fill="#FDBA74"/>
+</svg>
