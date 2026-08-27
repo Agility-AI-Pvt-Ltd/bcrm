@@ -51,6 +51,16 @@ export type MetaConfig = {
   app_id: string | null;
   config_id: string | null;
   graph_version: string;
+  // Whether a Redirect URI is registered, i.e. whether setup links can be minted at all.
+  // Separate from `configured` because the popup needs no Redirect URI, so a server can
+  // legitimately support one door and not the other.
+  hosted_signup_available: boolean;
+};
+
+export type MetaSignupLink = {
+  url: string;
+  expires_at: string;
+  expires_in_minutes: number;
 };
 
 export type MetaConnectResult = {
@@ -285,6 +295,18 @@ export async function connectWhatsApp(payload: {
 
 export async function disconnectWhatsApp() {
   return apiFetch<ApiKeysState>("/api/v1/meta/disconnect", { method: "POST" });
+}
+
+/**
+ * Mint a single-use link that lets someone else finish the WhatsApp setup.
+ *
+ * For the common case where the person holding the agency's Facebook password is not the
+ * person sitting in front of EstateFlow. The returned URL is a credential — it carries a
+ * signed token naming this organization — so treat it like one: send it to the person who
+ * needs it, not into a group chat. Each call invalidates any link issued before it.
+ */
+export async function createWhatsAppSignupLink() {
+  return apiFetch<MetaSignupLink>("/api/v1/meta/signup-link", { method: "POST" });
 }
 
 export async function listPlans() {

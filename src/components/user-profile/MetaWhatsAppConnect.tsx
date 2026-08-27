@@ -1,13 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import {
   ApiError,
   connectWhatsApp,
+  createWhatsAppSignupLink,
   disconnectWhatsApp,
   getApiKeys,
   getMetaConfig,
   type ApiKeysState,
+  type MetaSignupLink,
 } from "@/lib/auth";
 
 /* Facebook Login for Business, reduced to the three calls this flow makes.
@@ -92,6 +100,100 @@ function loadSdk(appId: string, version: string): Promise<FbSdk> {
   return sdkPromise;
 }
 
+/* ---------------------------------------------------------------------------
+ * The result of a setup link, read back off the URL.
+ *
+ * A shared link is finished in someone else's browser, so the callback's only way to
+ * report anything is the redirect itself: it lands on this page as
+ * ?whatsapp=connected|cancelled|error&reason=…
+ *
+ * Read through useSyncExternalStore for the same reason useStoredUser is — the server
+ * render cannot know the query string, so the server and hydration passes are handed ""
+ * and React re-renders once with the real value. Reading it in an effect instead would
+ * mean a setState the moment this mounts, and reading window.location during render
+ * would be a hydration mismatch.
+ * ------------------------------------------------------------------------- */
+
+function subscribeToLocation(onChange: () => void) {
+  // A finished link arrives as a full page load, so in practice this is read once on
+  // mount and never changes. popstate is cheap insurance for a back-navigation onto
+  // this page while the card stays mounted.
+  window.addEventListener("popstate", onChange);
+  return () => window.removeEventListener("popstate", onChange);
+}
+
+// Returns a primitive deliberately: useSyncExternalStore re-renders forever if the
+// snapshot is a fresh object on every call.
+function locationSearch(): string {
+  return window.location.search;
+}
+
+function noLocationSearch(): string {
+  return "";
+}
+
+type Arrival = { tone: "success" | "error" | "info"; message: string };
+
+const TONE_CLASS: Record<Arrival["tone"], string> = {
+  success: "text-success-600",
+  error: "text-error-500",
+  info: "text-gray-600 dark:text-gray-300",
+};
+
+/* The callback sends back a short sentence written for customers, and deliberately no
+ * ids, phone numbers or links — see `_return_to_app` in the API. Anything outside that
+ * shape did not come from us, and this URL is one people share, so `reason` is text a
+ * stranger can choose and have rendered on our own domain. React escapes it, so the risk
+ * is not markup; it is a convincing "your account is suspended, call this number" wearing
+ * our styling. Text that breaks the API's own contract falls back to a generic message,
+ * and the real detail stays in the server log where it can be trusted. */
+const REASON_MAX_LENGTH = 200;
+const REASON_NOT_OURS = /https?:|www\.|[@+]|\d{5,}/i;
+
+function describeArrival(search: string): Arrival | null {
+  const params = new URLSearchParams(search);
+  const status = params.get("whatsapp");
+  if (!status) return null;
+
+  if (status === "connected") {
+    return {
+      tone: "success",
+      message: "WhatsApp is connected. That setup link is now used up.",
+    };
+  }
+  if (status === "cancelled") {
+    // The callback returns before spending the nonce, so the link really does still
+    // work. Worth saying: otherwise someone asks for a new one they do not need.
+    return {
+      tone: "info",
+      message: "Setup was cancelled and nothing changed. The same link still works.",
+    };
+  }
+  if (status !== "error") return null;
+
+  const reason = (params.get("reason") ?? "").trim();
+  const ours =
+    reason.length > 0 && reason.length <= REASON_MAX_LENGTH && !REASON_NOT_OURS.test(reason);
+  return {
+    tone: "error",
+    message: ours
+      ? `${reason} Create a new setup link to try again.`
+      : "That setup link did not go through. Create a new one to try again.",
+  };
+}
+
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // No permission, or a page served over plain http, where the API does not exist.
+    // The link is on screen and selectable either way, so this only changes what we
+    // claim happened.
+    return false;
+  }
+}
+
 type Props = {
   apiKeys: ApiKeysState | null;
   onChange: (keys: ApiKeysState) => void;
@@ -102,6 +204,15 @@ export default function MetaWhatsAppConnect({ apiKeys, onChange }: Props) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
+  // False until the config arrives, which is what keeps the setup-link button off a
+  // deployment that has no Redirect URI registered — there, minting a link would only
+  // produce something that dead-ends at Meta.
+  const [canShare, setCanShare] = useState(false);
+  // Separate from `busy` so the label lands on the button that is actually working. Both
+  // still lock every control: two Meta flows at once is not a thing anyone wants.
+  const [sharing, setSharing] = useState(false);
+  const [link, setLink] = useState<MetaSignupLink | null>(null);
+  const [copied, setCopied] = useState<"" | "done" | "failed">("");
   // Meta delivers the account details and the authorization code through two separate
   // browser channels, so each one is parked here until the other shows up.
   const signup = useRef<{ waba_id?: string; phone_number_id?: string }>({});
@@ -117,10 +228,24 @@ export default function MetaWhatsAppConnect({ apiKeys, onChange }: Props) {
     [],
   );
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        setCanShare((await getMetaConfig()).hosted_signup_available);
+      } catch {
+        // This only decides whether the setup-link button is offered. Connect fetches
+        // the config again on click and reports its own failure, so there is nothing to
+        // announce here: a card with one working button beats an error on arrival.
+      }
+    })();
+  }, []);
+
   const connect = useCallback(async () => {
     setError("");
     setNotice("");
     setWarnings([]);
+    setLink(null);
+    setCopied("");
     signup.current = {};
 
     let config;
@@ -211,11 +336,42 @@ export default function MetaWhatsAppConnect({ apiKeys, onChange }: Props) {
     );
   }, [onChange]);
 
+  /**
+   * Mint a link that lets someone else finish the setup, and put it on the clipboard.
+   *
+   * The other half of the same door: the popup needs the agency's Facebook password in
+   * front of this screen, and often it is not. Nothing is sent from here — the link is
+   * handed back for the person to pass on however they already talk to their customer.
+   */
+  const share = useCallback(async () => {
+    setSharing(true);
+    setError("");
+    setNotice("");
+    setWarnings([]);
+    setLink(null);
+    setCopied("");
+    try {
+      const minted = await createWhatsAppSignupLink();
+      setLink(minted);
+      setCopied((await copyToClipboard(minted.url)) ? "done" : "failed");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not create a setup link.");
+    } finally {
+      setSharing(false);
+    }
+  }, []);
+
+  const recopy = useCallback(async (url: string) => {
+    setCopied((await copyToClipboard(url)) ? "done" : "failed");
+  }, []);
+
   const disconnect = useCallback(async () => {
     setBusy(true);
     setError("");
     setNotice("");
     setWarnings([]);
+    setLink(null);
+    setCopied("");
     try {
       onChange(await disconnectWhatsApp());
       setNotice("WhatsApp disconnected. Your chats and contacts are untouched.");
@@ -228,8 +384,15 @@ export default function MetaWhatsAppConnect({ apiKeys, onChange }: Props) {
 
   const connected = apiKeys?.whatsapp_configured ?? false;
   const selfService = apiKeys?.whatsapp_connected_via === "embedded_signup";
+  const locked = busy || sharing;
   const label =
     apiKeys?.whatsapp_display_number || apiKeys?.whatsapp_phone_number_id || "your number";
+
+  const search = useSyncExternalStore(subscribeToLocation, locationSearch, noLocationSearch);
+  // Anything the person has done since arriving is more current than the URL they
+  // arrived with, so their own result wins the message area.
+  const acted = Boolean(error || notice || link || warnings.length);
+  const arrival = acted ? null : describeArrival(search);
 
   return (
     <div className="rounded-xl border border-brand-100 bg-brand-25 p-4 dark:border-brand-500/30 dark:bg-brand-500/[0.06]">
@@ -246,20 +409,30 @@ export default function MetaWhatsAppConnect({ apiKeys, onChange }: Props) {
               : "Sign in with Facebook and pick the number you use for customers. Meta handles the setup — you never copy a token."}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={() => void connect()}
-            disabled={busy}
+            disabled={locked}
             className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
           >
             {busy ? "Working…" : connected ? "Reconnect" : "Connect WhatsApp"}
           </button>
+          {canShare ? (
+            <button
+              type="button"
+              onClick={() => void share()}
+              disabled={locked}
+              className="rounded-lg border border-brand-200 px-4 py-2.5 text-sm font-medium text-brand-600 hover:bg-brand-50 disabled:opacity-50 dark:border-brand-500/40 dark:text-brand-300 dark:hover:bg-brand-500/10"
+            >
+              {sharing ? "Working…" : "Create a setup link"}
+            </button>
+          ) : null}
           {connected && selfService ? (
             <button
               type="button"
               onClick={() => void disconnect()}
-              disabled={busy}
+              disabled={locked}
               className="text-sm font-medium text-gray-600 underline-offset-4 hover:underline disabled:opacity-50 dark:text-gray-300"
             >
               Disconnect
@@ -267,6 +440,45 @@ export default function MetaWhatsAppConnect({ apiKeys, onChange }: Props) {
           ) : null}
         </div>
       </div>
+
+      {canShare && !connected && !link ? (
+        <p className="mt-3 max-w-xl text-sm text-gray-600 dark:text-gray-300">
+          Not the person with the Facebook password? Create a setup link and send it to
+          whoever is. They finish in Meta, and the number arrives here.
+        </p>
+      ) : null}
+
+      {link ? (
+        <div className="mt-3 rounded-lg border border-brand-200 p-3 dark:border-brand-500/40">
+          <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+            Send this to the person finishing the setup
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              readOnly
+              value={link.url}
+              aria-label="Setup link"
+              onFocus={(event) => event.currentTarget.select()}
+              className="h-10 min-w-0 flex-1 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-700 dark:border-gray-700 dark:text-white/90"
+            />
+            <button
+              type="button"
+              onClick={() => void recopy(link.url)}
+              className="h-10 rounded-lg bg-brand-500 px-3 text-sm font-medium text-white hover:bg-brand-600"
+            >
+              Copy
+            </button>
+          </div>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+            {copied === "done" ? "Copied to your clipboard. " : null}
+            {copied === "failed" ? "Select the link to copy it. " : null}
+            It works once and expires in {link.expires_in_minutes}{" "}
+            {link.expires_in_minutes === 1 ? "minute" : "minutes"}. Whoever opens it can
+            attach a WhatsApp number to this account, so send it to one person rather
+            than a group.
+          </p>
+        </div>
+      ) : null}
 
       {error ? <p className="mt-3 text-sm text-error-500">{error}</p> : null}
       {notice ? <p className="mt-3 text-sm text-success-600">{notice}</p> : null}
@@ -276,6 +488,9 @@ export default function MetaWhatsAppConnect({ apiKeys, onChange }: Props) {
             <li key={item}>{item}</li>
           ))}
         </ul>
+      ) : null}
+      {arrival ? (
+        <p className={`mt-3 text-sm ${TONE_CLASS[arrival.tone]}`}>{arrival.message}</p>
       ) : null}
     </div>
   );
