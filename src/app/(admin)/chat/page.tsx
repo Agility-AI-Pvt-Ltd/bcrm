@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import ChatPage from "@/components/support/ChatPage";
 
 export const metadata: Metadata = {
-  title: "Chat | RealtyReach",
+  title: "Chat | EstateFlow",
   description: "Support chat workspace",
 };
 

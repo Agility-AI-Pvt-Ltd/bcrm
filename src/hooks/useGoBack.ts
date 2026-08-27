@@ -7,7 +7,9 @@ const useGoBack = () => {
     if (window.history.length > 1) {
       router.back(); // Navigate to the previous route
     } else {
-      router.push("/"); // Redirect to home if no history exists
+      // No history to go back to — most often a link opened in a new tab. Send
+      // them into the app rather than to the public landing page at `/`.
+      router.push("/dashboard");
     }
   };
 

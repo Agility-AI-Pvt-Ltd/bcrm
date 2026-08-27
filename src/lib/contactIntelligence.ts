@@ -2,15 +2,101 @@ import { apiFetch } from "@/lib/api";
 
 export type StoredContact = {
   id: string;
+  organization_id?: string;
   name: string;
   phone: string | null;
+  alternate_phone?: string | null;
+  whatsapp?: string | null;
   email: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
   source: string;
   tag: string;
+  purpose?: string | null;
+  lead_status?: string | null;
+  priority?: string | null;
+  intent_score?: number | null;
+  property_type?: string | null;
+  bhk?: string | null;
+  budget_min?: string | null;
+  budget_max?: string | null;
+  budget_label?: string | null;
+  preferred_location?: string | null;
+  furnishing?: string | null;
+  facing?: string | null;
+  carpet_area?: string | null;
+  possession?: string | null;
+  possession_timeline?: string | null;
+  loan_required?: string | null;
+  ready_to_move?: boolean | null;
+  portal_name?: string | null;
+  listing_id?: string | null;
+  project_name?: string | null;
+  property_address?: string | null;
+  asking_price?: string | null;
+  ownership_type?: string | null;
+  assigned_to?: string | null;
+  last_contacted_at?: string | null;
+  next_follow_up_at?: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
 };
+
+/** Columns shown in CRM contacts table (empty values render as —). */
+export const CRM_CONTACT_COLUMNS: Array<{
+  key: keyof StoredContact;
+  label: string;
+}> = [
+  { key: "name", label: "Name" },
+  { key: "phone", label: "Phone" },
+  { key: "alternate_phone", label: "Alt phone" },
+  { key: "whatsapp", label: "WhatsApp" },
+  { key: "email", label: "Email" },
+  { key: "city", label: "City" },
+  { key: "state", label: "State" },
+  { key: "pincode", label: "Pincode" },
+  { key: "source", label: "Source" },
+  { key: "tag", label: "Tag" },
+  { key: "purpose", label: "Purpose" },
+  { key: "lead_status", label: "Lead status" },
+  { key: "priority", label: "Priority" },
+  { key: "intent_score", label: "Intent score" },
+  { key: "property_type", label: "Property type" },
+  { key: "bhk", label: "BHK" },
+  { key: "budget_label", label: "Budget" },
+  { key: "budget_min", label: "Budget min" },
+  { key: "budget_max", label: "Budget max" },
+  { key: "preferred_location", label: "Preferred location" },
+  { key: "furnishing", label: "Furnishing" },
+  { key: "facing", label: "Facing" },
+  { key: "carpet_area", label: "Carpet area" },
+  { key: "possession", label: "Possession" },
+  { key: "possession_timeline", label: "Possession timeline" },
+  { key: "loan_required", label: "Loan required" },
+  { key: "ready_to_move", label: "Ready to move" },
+  { key: "portal_name", label: "Portal" },
+  { key: "listing_id", label: "Listing ID" },
+  { key: "project_name", label: "Project" },
+  { key: "property_address", label: "Property address" },
+  { key: "asking_price", label: "Asking price" },
+  { key: "ownership_type", label: "Ownership" },
+  { key: "assigned_to", label: "Assigned to" },
+  { key: "last_contacted_at", label: "Last contacted" },
+  { key: "next_follow_up_at", label: "Next follow-up" },
+  { key: "notes", label: "Notes" },
+];
+
+export function formatContactCell(
+  contact: StoredContact,
+  key: keyof StoredContact,
+): string {
+  const value = contact[key];
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return String(value);
+}
 
 export type AvailableColumn = {
   name: string;
@@ -46,6 +132,52 @@ export type ContactIntelligencePlan = {
   accepted_mappings?: Array<{ column: string; field?: string | null; confidence?: number }>;
 };
 
+export type OperationReport = {
+  status: "success" | "partial" | "failure" | string;
+  message: string;
+  message_source?: "llm" | "deterministic" | string;
+  metadata: {
+    source?: {
+      type?: string;
+      google_sheet_url?: string | null;
+      file_name?: string | null;
+      worksheets_selected?: string[];
+      worksheet_count?: number;
+      all_worksheets?: boolean;
+      select_all_requested?: boolean;
+    };
+    llm?: {
+      used?: boolean;
+      provider?: string | null;
+      reason?: string | null;
+      columns_sent?: number;
+      suggestions?: number;
+      spreadsheet_sent_to_llm?: boolean;
+    };
+    effects?: {
+      pipeline_status?: string;
+      source_rows?: number;
+      source_columns?: number;
+      importable_count?: number;
+      duplicate_contacts?: number;
+      valid_phone_numbers?: number;
+      valid_emails?: number;
+      lead_fields_detected?: number;
+      ready_to_import?: boolean;
+      accepted_mappings?: number;
+      review_mappings?: number;
+      needs_user_decisions?: number;
+      imported_count?: number;
+    };
+    mappings?: {
+      accepted?: Array<{ column: string; field?: string | null; confidence?: number }>;
+      review?: Array<{ column: string; field?: string | null; confidence?: number }>;
+      needs_user?: Array<{ column: string; field?: string | null }>;
+    };
+    errors?: string[];
+  };
+};
+
 export type ContactIntelligenceResult = {
   status: string;
   inferred_mapping?: Record<
@@ -54,6 +186,7 @@ export type ContactIntelligenceResult = {
   >;
   import_plan: ContactIntelligencePlan;
   imported_count?: number;
+  operation_report?: OperationReport;
   privacy?: {
     mode: string;
     spreadsheet_sent_to_llm: boolean;
@@ -68,7 +201,6 @@ export type ContactStats = {
   total: number;
   with_phone: number;
   with_email: number;
-  google_sheets_connected: boolean;
 };
 
 export type PageResult<T> = {
@@ -89,6 +221,8 @@ export type ContactDatasetSummary = {
   created_at: string;
   duplicate_count?: number;
   has_duplicates?: boolean;
+  crm_imported_count?: number;
+  can_undo_crm_import?: boolean;
 };
 
 export type DatasetDuplicateSample = {
@@ -177,6 +311,25 @@ export type DropDuplicatesResult = {
   dataset: ContactDataset;
   rows_removed: number;
   rows_remaining: number;
+  message: string;
+};
+
+export type ImportDatasetToCrmResult = {
+  dataset_id: string;
+  dataset_name: string;
+  source_rows: number;
+  contacts_created: number;
+  contacts_skipped: number;
+  identity_columns: Record<string, string | null>;
+  can_undo?: boolean;
+  message: string;
+};
+
+export type UndoImportDatasetToCrmResult = {
+  dataset_id: string;
+  dataset_name: string;
+  contacts_removed: number;
+  can_undo: boolean;
   message: string;
 };
 
@@ -276,7 +429,21 @@ export async function dropDatasetDuplicates(datasetId: string) {
   );
 }
 
-export async function listContacts(page = 1, pageSize = 50) {
+export async function importDatasetToCrm(datasetId: string) {
+  return apiFetch<ImportDatasetToCrmResult>(
+    `/api/v1/contacts/datasets/${datasetId}/import-to-crm`,
+    { method: "POST" },
+  );
+}
+
+export async function undoImportDatasetToCrm(datasetId: string) {
+  return apiFetch<UndoImportDatasetToCrmResult>(
+    `/api/v1/contacts/datasets/${datasetId}/undo-import-to-crm`,
+    { method: "POST" },
+  );
+}
+
+export async function listContacts(page = 1, pageSize = 15) {
   return apiFetch<PageResult<StoredContact>>(
     `/api/v1/contacts?page=${page}&page_size=${pageSize}`,
   );

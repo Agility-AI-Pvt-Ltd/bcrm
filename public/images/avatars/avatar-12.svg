@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Crimson, flower avatar">
+  <circle cx="64" cy="64" r="64" fill="#9F1239"/>
+  <path d="M27 128 C27 103 43 87 64 87 C85 87 101 103 101 128 Z" fill="#A78BFA"/>
+  <rect x="56" y="70" width="16" height="21" rx="7" fill="#F8FAFC"/>
+  <circle cx="36" cy="56" r="7.5" fill="#F8FAFC"/>
+  <circle cx="92" cy="56" r="7.5" fill="#F8FAFC"/>
+  <ellipse cx="64" cy="55" rx="27" ry="24" fill="#F8FAFC"/>
+  <ellipse cx="53.5" cy="53" rx="9.0" ry="10.0" fill="#1F2937"/>
+  <circle cx="50.89" cy="49.6" r="2.9" fill="#FFFFFF"/>
+  <ellipse cx="74.5" cy="53" rx="9.0" ry="10.0" fill="#1F2937"/>
+  <circle cx="71.89" cy="49.6" r="2.9" fill="#FFFFFF"/>
+  <path d="M53 67 Q64 79 75 67 Z" fill="#1F2937"/>
+  <circle cx="41" cy="36.4" r="4.2" fill="#FDE047"/><circle cx="45.6" cy="41" r="4.2" fill="#FDE047"/><circle cx="41" cy="45.6" r="4.2" fill="#FDE047"/><circle cx="36.4" cy="41" r="4.2" fill="#FDE047"/>
+  <circle cx="41" cy="41" r="3" fill="#F97316"/>
+  <path d="M64 32 L64 14" stroke="#FDA4AF" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="64" cy="11" r="7" fill="#FDA4AF"/>
+</svg>

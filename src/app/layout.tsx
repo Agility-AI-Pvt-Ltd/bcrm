@@ -3,10 +3,19 @@ import './globals.css';
 import "flatpickr/dist/flatpickr.css";
 import { SidebarProvider } from '@/context/SidebarContext';
 import { ThemeProvider } from '@/context/ThemeContext';
+import type { Metadata } from 'next';
 
 const outfit = Outfit({
   subsets: ["latin"],
 });
+
+export const metadata: Metadata = {
+  title: {
+    default: "EstateFlow",
+    template: "%s | EstateFlow",
+  },
+  description: "EstateFlow — AI-assisted real-estate campaign workspace",
+};
 
 export default function RootLayout({
   children,

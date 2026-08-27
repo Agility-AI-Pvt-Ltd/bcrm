@@ -1,16 +1,16 @@
-# TailAdmin Next.js - Free Next.js Tailwind Admin Dashboard Template
+# EstateAdmin (EstateFlow)
 
-TailAdmin is a free and open-source admin dashboard template built on **Next.js and Tailwind CSS** providing developers with everything they need to create a feature-rich and data-driven: back-end, dashboard, or admin panel solution for any sort of web project.
+EstateFlow is a free and open-source admin dashboard template built on **Next.js and Tailwind CSS** providing developers with everything they need to create a feature-rich and data-driven: back-end, dashboard, or admin panel solution for any sort of web project.
 
-![TailAdmin - Next.js Dashboard Preview](./banner.png)
+![EstateFlow - EstateAdmin Preview](./banner.png)
 
-With TailAdmin Next.js, you get access to all the necessary dashboard UI components, elements, and pages required to build a high-quality and complete dashboard or admin panel. Whether you're building a dashboard or admin panel for a complex web application or a simple website.
+With EstateFlow Next.js, you get access to all the necessary dashboard UI components, elements, and pages required to build a high-quality and complete dashboard or admin panel. Whether you're building a dashboard or admin panel for a complex web application or a simple website.
 
-TailAdmin utilizes the powerful features of **Next.js 16** and common features of Next.js such as server-side rendering (SSR), static site generation (SSG), and seamless API route integration. Combined with the advancements of **React 19** and the robustness of **TypeScript**, TailAdmin is the perfect solution to help get your project up and running quickly.
+EstateFlow utilizes the powerful features of **Next.js 16** and common features of Next.js such as server-side rendering (SSR), static site generation (SSG), and seamless API route integration. Combined with the advancements of **React 19** and the robustness of **TypeScript**, EstateFlow is the perfect solution to help get your project up and running quickly.
 
 ## Overview
 
-TailAdmin provides essential UI components and layouts for building feature-rich, data-driven admin dashboards and control panels. It's built on:
+EstateFlow provides essential UI components and layouts for building feature-rich, data-driven admin dashboards and control panels. It's built on:
 
 * Next.js 16.x
 * React 19
@@ -32,17 +32,17 @@ TailAdmin provides essential UI components and layouts for building feature-rich
 
 ### Other Versions
 
-- [Next.js Version](https://github.com/TailAdmin/free-nextjs-admin-dashboard)
-- [React.js Version](https://github.com/TailAdmin/free-react-tailwind-admin-dashboard)
-- [Vue.js Version](https://github.com/TailAdmin/vue-tailwind-admin-dashboard)
-- [Angular Version](https://github.com/TailAdmin/free-angular-tailwind-dashboard)
-- [Laravel Version](https://github.com/TailAdmin/tailadmin-laravel)
+- [Next.js Version](https://github.com/EstateFlow/free-nextjs-admin-dashboard)
+- [React.js Version](https://github.com/EstateFlow/free-react-tailwind-admin-dashboard)
+- [Vue.js Version](https://github.com/EstateFlow/vue-tailwind-admin-dashboard)
+- [Angular Version](https://github.com/EstateFlow/free-angular-tailwind-dashboard)
+- [Laravel Version](https://github.com/EstateFlow/tailadmin-laravel)
 
 ## Installation
 
 ### Prerequisites
 
-To get started with TailAdmin, ensure you have the following prerequisites installed and set up:
+To get started with EstateFlow, ensure you have the following prerequisites installed and set up:
 
 * Node.js 18.x or later (recommended to use Node.js 20.x or later)
 
@@ -51,7 +51,7 @@ To get started with TailAdmin, ensure you have the following prerequisites insta
 Clone the repository using the following command:
 
 ```bash
-git clone https://github.com/TailAdmin/free-nextjs-admin-dashboard.git
+git clone https://github.com/EstateFlow/free-nextjs-admin-dashboard.git
 ```
 
 > Windows Users: place the repository near the root of your drive if you face issues while cloning.
@@ -76,7 +76,7 @@ git clone https://github.com/TailAdmin/free-nextjs-admin-dashboard.git
 
 ## Components
 
-TailAdmin is a pre-designed starting point for building a web-based dashboard using Next.js and Tailwind CSS. The template includes:
+EstateFlow is a pre-designed starting point for building a web-based dashboard using Next.js and Tailwind CSS. The template includes:
 
 * Sophisticated and accessible sidebar
 * Data visualization components
@@ -202,7 +202,7 @@ A major update focused on Next.js 16 implementation and comprehensive redesign.
 
 ## License
 
-TailAdmin Next.js Free Version is released under the MIT License.
+EstateFlow Next.js Free Version is released under the MIT License.
 
 ## Support
 If you find this project helpful, please consider giving it a star on GitHub. Your support helps us continue developing and maintaining this template.

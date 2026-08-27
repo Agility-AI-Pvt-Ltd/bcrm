@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import InboxDetailsPage from "@/components/support/InboxDetailsPage";
 
 export const metadata: Metadata = {
-  title: "Inbox Details | RealtyReach",
+  title: "Inbox Details | EstateFlow",
   description: "Email inbox details",
 };
 
