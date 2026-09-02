@@ -126,8 +126,11 @@ export default function ApiManagementForm() {
           </div>
         </div>
         <div className="rounded-xl border border-gray-100 p-4 dark:border-gray-800">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="font-medium text-gray-800 dark:text-white/90">WhatsApp Business</p>
+          {/* Heading and rule, with the Enabled switch riding on the same line. The card
+              below owns everything about the connection itself, so this stays a frame:
+              one name for the section and one control that belongs to us rather than Meta. */}
+          <div className="mb-3 flex items-center justify-between gap-2 border-b border-gray-100 pb-3 dark:border-gray-800">
+            <p className="font-medium text-gray-800 dark:text-white/90">WhatsApp Integration</p>
             <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
               <input
                 type="checkbox"
