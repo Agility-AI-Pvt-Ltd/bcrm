@@ -74,6 +74,20 @@ git clone https://github.com/EstateFlow/free-nextjs-admin-dashboard.git
    yarn dev
    ```
 
+### Development with ngrok
+
+When accessing the local development server through an ngrok tunnel, this project allows ngrok's free development domains via `allowedDevOrigins` in `next.config.ts`:
+
+```ts
+allowedDevOrigins: ["*.ngrok-free.app"]
+```
+
+This lets Next.js load `/_next/*` assets through changing `ngrok-free.app` tunnel URLs. Restart the development server after changing this setting:
+
+```bash
+npm run dev
+```
+
 ## Components
 
 EstateFlow is a pre-designed starting point for building a web-based dashboard using Next.js and Tailwind CSS. The template includes:
