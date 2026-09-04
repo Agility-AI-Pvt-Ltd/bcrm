@@ -10,6 +10,7 @@ import { profileAvatarName, resolveProfileAvatar } from "@/lib/avatars";
 
 const MENU_ITEMS = [
   { href: "/profile", label: "Edit profile" },
+  { href: "/profile/availability", label: "Availability" },
   { href: "/profile/work-locations", label: "Work locations" },
   { href: "/profile/api-management", label: "API management" },
   { href: "/profile/change-password", label: "Change password" },
