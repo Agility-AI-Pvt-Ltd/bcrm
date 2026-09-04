@@ -26,6 +26,7 @@ const navItems: NavItem[] = [
     name: "Campaign Studio",
     subItems: [
       { name: "WhatsApp Outreach", path: "/outreach", pro: false, new: true },
+      { name: "AI Calling", path: "/calls", pro: false, new: true },
       { name: "Messages", path: "/messages", pro: false, new: true },
       { name: "Lead Pipeline", path: "/pipeline", pro: false, new: true },
       { name: "Campaigns", path: "/campaigns", pro: false },
