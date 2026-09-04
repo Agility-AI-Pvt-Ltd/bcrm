@@ -357,15 +357,21 @@ export default function MessagesWorkspace() {
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50 px-5 py-4 dark:border-brand-500/40 dark:bg-brand-500/10">
           <p className="text-sm text-gray-700 dark:text-gray-200">
             <span className="font-medium">“{madeGroup.name}”</span> is ready with{" "}
-            {madeGroup.rows} customer{madeGroup.rows === 1 ? "" : "s"}. Pick it as the
-            list in WhatsApp Outreach to message only this group.
+            {madeGroup.rows} customer{madeGroup.rows === 1 ? "" : "s"}. Message them on
+            WhatsApp, or have the AI call them.
           </p>
           <div className="flex items-center gap-2">
             <a
               href={`/outreach?dataset=${encodeURIComponent(madeGroup.id)}`}
               className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
             >
-              Open WhatsApp Outreach
+              Message on WhatsApp
+            </a>
+            <a
+              href={`/calls?dataset=${encodeURIComponent(madeGroup.id)}`}
+              className="rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-500/10"
+            >
+              Call this group
             </a>
             <button
               type="button"
