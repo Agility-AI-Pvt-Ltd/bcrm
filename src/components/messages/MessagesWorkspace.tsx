@@ -22,6 +22,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ChatPanel from "@/components/messages/ChatPanel";
 import MessageFilters from "@/components/messages/MessageFilters";
@@ -61,6 +62,8 @@ const COUNT_FILTERS: { key: string; patch: Partial<InboxFilters> | null }[] = [
 ];
 
 export default function MessagesWorkspace() {
+  const searchParams = useSearchParams();
+  const conversationFromUrl = searchParams.get("conversation");
   const [vocabulary, setVocabulary] = useState<FilterVocabulary | null>(null);
 
   const [filters, setFilters] = useState<InboxFilters>({});
@@ -154,6 +157,10 @@ export default function MessagesWorkspace() {
     },
     [say],
   );
+
+  useEffect(() => {
+    if (conversationFromUrl) void openThread(conversationFromUrl);
+  }, [conversationFromUrl, openThread]);
 
   /** Offset walks backwards from the latest message, so older pages prepend. */
   const loadOlder = useCallback(async () => {
