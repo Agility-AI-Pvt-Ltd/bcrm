@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import MessagesWorkspace from "@/components/messages/MessagesWorkspace";
 
 export const metadata: Metadata = {
@@ -8,5 +9,9 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <MessagesWorkspace />;
+  return (
+    <Suspense fallback={<p className="text-sm text-gray-500">Loading messages…</p>}>
+      <MessagesWorkspace />
+    </Suspense>
+  );
 }
