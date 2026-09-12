@@ -7,10 +7,13 @@ import { getAccessToken, getStoredUser } from "@/lib/auth";
 /**
  * `/dashboard` is the signed-in entry point: it decides where "into the app"
  * means for this account rather than being a screen of its own. Guests go to
- * sign-in, accounts without a plan go to plans, everyone else goes to campaigns.
+ * sign-in, accounts without a plan go to plans, everyone else goes to the leads
+ * list — people sign in because a customer is waiting on a reply, so the first
+ * screen should be who that is.
  *
- * It used to live at `/`. That address now belongs to the public landing page,
- * so anything inside the app that means "take me home" points here.
+ * It used to live at `/`. That address now belongs to the public landing page.
+ * Note this is only the post-auth redirect: in-app links that mean "home" point
+ * straight at `/leads`.
  */
 export default function DashboardEntryPage() {
   const router = useRouter();
@@ -26,7 +29,7 @@ export default function DashboardEntryPage() {
       router.replace("/plans");
       return;
     }
-    router.replace("/campaigns");
+    router.replace("/leads");
   }, [router]);
 
   return (

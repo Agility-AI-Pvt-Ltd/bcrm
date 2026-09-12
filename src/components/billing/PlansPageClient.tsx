@@ -168,10 +168,10 @@ export default function PlansPageClient() {
 
           <div className="mt-8">
             <Link
-              href="/campaigns"
+              href="/leads"
               className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600"
             >
-              Go to dashboard
+              Go to home
             </Link>
           </div>
         </div>

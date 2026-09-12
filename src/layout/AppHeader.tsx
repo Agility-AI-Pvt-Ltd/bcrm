@@ -83,7 +83,8 @@ const AppHeader: React.FC = () => {
             {/* Cross Icon */}
           </button>
 
-          <Link href="/dashboard" className="lg:hidden">
+          {/* Same gesture as the sidebar brand mark, just the phone-sized version. */}
+          <Link href="/leads" className="lg:hidden">
             <Image
               width={154}
               height={32}

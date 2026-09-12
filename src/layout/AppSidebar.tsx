@@ -266,7 +266,9 @@ const AppSidebar: React.FC = () => {
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
         }`}
       >
-        <Link href="/campaigns">
+        {/* The brand mark is the other "take me home" gesture people try, so it goes
+            where the Home menu item goes — the leads list — not to /campaigns. */}
+        <Link href="/leads">
           <span className="flex items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white">
               <GridIcon className="h-5 w-5" />
