@@ -16,6 +16,8 @@ export default function SignInForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Already signed in: skip the form. Enabled accounts land on the leads list,
+  // which is what "home" means everywhere in this app.
   useEffect(() => {
     const token = getAccessToken();
     if (!token) return;
@@ -24,7 +26,7 @@ export default function SignInForm() {
       router.replace("/plans");
       return;
     }
-    router.replace("/campaigns");
+    router.replace("/leads");
   }, [router]);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -44,7 +46,7 @@ export default function SignInForm() {
         router.push("/plans");
         return;
       }
-      router.push("/campaigns");
+      router.push("/leads");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Sign in failed.");
     } finally {

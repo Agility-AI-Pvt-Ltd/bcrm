@@ -17,9 +17,10 @@ const PageBreadcrumb: React.FC<BreadcrumbProps> = ({ pageTitle }) => {
       <nav>
         <ol className="flex items-center gap-1.5">
           <li>
+            {/* "Home" has one meaning app-wide: the leads list, same as the sidebar. */}
             <Link
               className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400"
-              href="/dashboard"
+              href="/leads"
             >
               Home
               <svg
