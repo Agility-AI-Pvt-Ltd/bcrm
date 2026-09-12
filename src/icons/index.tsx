@@ -12,6 +12,7 @@ import FolderIcon from "./folder.svg";
 import VideoIcon from "./videos.svg";
 import AudioIcon from "./audio.svg";
 import GridIcon from "./grid.svg";
+import HomeIcon from "./home.svg";
 import FileIcon from "./file.svg";
 import DownloadIcon from "./download.svg";
 import ArrowRightIcon from "./arrow-right.svg";
@@ -59,6 +60,7 @@ export {
   MoreDotIcon,
   FileIcon,
   GridIcon,
+  HomeIcon,
   AudioIcon,
   VideoIcon,
   BoltIcon,

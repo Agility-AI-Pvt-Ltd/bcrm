@@ -8,6 +8,7 @@ import {
   CalenderIcon,
   ChevronDownIcon,
   GridIcon,
+  HomeIcon,
   HorizontaLDots,
   ShootingStarIcon,
   UserCircleIcon,
@@ -22,6 +23,15 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
+  // Home is the leads list, and it is deliberately the first thing in the menu.
+  // What brings people back to this app is a customer waiting on a reply, so the
+  // fastest possible path to "who should I answer next" is the home they expect —
+  // not a dashboard, and not two clicks down inside Campaign Studio.
+  {
+    icon: <HomeIcon />,
+    name: "Home",
+    path: "/leads",
+  },
   {
     icon: <ShootingStarIcon />,
     name: "Campaign Studio",
@@ -32,7 +42,6 @@ const navItems: NavItem[] = [
       { name: "Lead Pipeline", path: "/pipeline", pro: false, new: true },
       { name: "Campaigns", path: "/campaigns", pro: false },
       { name: "Contacts", path: "/contacts", pro: false },
-      { name: "Leads", path: "/leads", pro: false },
       { name: "Properties", path: "/properties", pro: false },
     ],
   },
