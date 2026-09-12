@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
+  BellIcon,
   CalenderIcon,
   ChevronDownIcon,
   GridIcon,
@@ -34,6 +35,14 @@ const navItems: NavItem[] = [
       { name: "Leads", path: "/leads", pro: false },
       { name: "Properties", path: "/properties", pro: false },
     ],
+  },
+  // Deliberately top-level, not inside Campaign Studio: notifications span every
+  // campaign, and burying them a click deep defeats the point of a shortcut. The
+  // bell matches the one in the header so both read as the same destination.
+  {
+    icon: <BellIcon />,
+    name: "Notifications",
+    path: "/notifications",
   },
   {
     icon: <CalenderIcon />,
