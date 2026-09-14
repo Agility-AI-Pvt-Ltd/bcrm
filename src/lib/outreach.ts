@@ -226,6 +226,13 @@ export type Lead = {
   last_reply_text: string | null;
   first_messaged_at: string | null;
   outreach_paused: boolean;
+  /**
+   * When this customer asked for a human to phone them, and nobody has yet.
+   * Null for almost everybody. A timestamp rather than a flag because the screen
+   * shows how long they have been waiting — a lead who asked an hour ago and one
+   * who asked yesterday need different urgency.
+   */
+  callback_requested_at: string | null;
   preferred_location: string | null;
   bhk: string | null;
   budget_label: string | null;
@@ -363,6 +370,7 @@ export async function listLeads(
     stage?: string;
     tier?: string;
     replied?: boolean;
+    awaitingCallback?: boolean;
     search?: string;
     limit?: number;
     offset?: number;
@@ -372,10 +380,34 @@ export async function listLeads(
   if (params.stage) query.set("stage", params.stage);
   if (params.tier) query.set("tier", params.tier);
   if (params.replied) query.set("replied", "true");
+  if (params.awaitingCallback) query.set("awaiting_callback", "true");
   if (params.search) query.set("search", params.search);
   query.set("limit", String(params.limit ?? 50));
   query.set("offset", String(params.offset ?? 0));
   return apiFetch<LeadPage>(`/api/v1/outreach/leads?${query}`);
+}
+
+export type CallbackMarkCalledResult = {
+  contact_id: string;
+  /** How many open requests were closed. 0 means somebody else got there first. */
+  marked: number;
+  /** Still waiting? Only true for a merged contact with a second open request. */
+  awaiting_callback: boolean;
+  /** Everyone left on the call list, for the stat card. */
+  waiting_total: number;
+};
+
+/**
+ * Record that a broker phoned this customer, clearing them off the call list.
+ *
+ * Safe to call twice — the backend closes whatever is open and returns
+ * `marked: 0` when there was nothing left, rather than erroring.
+ */
+export async function markCallbackCalled(contactId: string) {
+  return apiFetch<CallbackMarkCalledResult>(
+    `/api/v1/outreach/leads/${encodeURIComponent(contactId)}/callback/called`,
+    { method: "POST" },
+  );
 }
 
 // ---------------------------------------------------------------------------
