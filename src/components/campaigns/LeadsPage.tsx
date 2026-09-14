@@ -17,6 +17,14 @@
  * This is the separate view for leads. /contacts remains the full book of
  * business and /pipeline remains the stage-and-tier board; nobody is removed from
  * either by appearing here.
+ *
+ * One thing on this page is not a filter but a work queue: when the AI offers a
+ * callback and the customer says yes, the backend writes a `callback_requests`
+ * row and stamps `callback_requested_at` on the contact. Those leads are sorted
+ * above everyone else (oldest wait first, decided server-side), carry an amber
+ * marker, and stay there until a human presses "Mark called". Nothing clears them
+ * automatically — the flag stands for a promise made to a person, so only a
+ * person can say it was kept.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -30,6 +38,7 @@ import {
   formatWhen,
   getPipeline,
   listLeads,
+  markCallbackCalled,
   stageBadgeColor,
   tierBadgeColor,
   type Lead,
@@ -60,6 +69,8 @@ export default function LeadsPage() {
   const [page, setPage] = useState<LeadPageData | null>(null);
   const [stage, setStage] = useState("");
   const [tier, setTier] = useState("");
+  const [awaitingOnly, setAwaitingOnly] = useState(false);
+  const [markingId, setMarkingId] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [offset, setOffset] = useState(0);
@@ -99,6 +110,7 @@ export default function LeadsPage() {
           replied: true,
           stage: stage || undefined,
           tier: tier || undefined,
+          awaitingCallback: awaitingOnly || undefined,
           search: search || undefined,
           limit: PAGE_SIZE,
           offset,
@@ -109,7 +121,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [stage, tier, search, offset]);
+  }, [stage, tier, awaitingOnly, search, offset]);
 
   useEffect(() => {
     void loadSnapshot();
@@ -124,8 +136,40 @@ export default function LeadsPage() {
     void loadLeads();
   }, [loadSnapshot, loadLeads]);
 
+  /**
+   * "I called them." Closes every open request for this lead and refreshes both
+   * the totals and the page, so the row leaves the top of the list immediately.
+   *
+   * `marked: 0` is not an error — it means the request was already closed, most
+   * likely by a colleague looking at the same screen. Say so plainly instead of
+   * showing a failure for something that ended in the right state.
+   */
+  const markCalled = useCallback(
+    async (lead: Lead) => {
+      const who = lead.name || "This lead";
+      setMarkingId(lead.id);
+      try {
+        const result = await markCallbackCalled(lead.id);
+        setNotice(
+          result.marked
+            ? `${who} is off the call list.`
+            : `${who} was already marked as called.`,
+        );
+        reload();
+      } catch (error) {
+        setNotice(
+          error instanceof ApiError ? error.message : "Could not save that call.",
+        );
+      } finally {
+        setMarkingId("");
+      }
+    },
+    [reload],
+  );
+
   const counts = snapshot?.counts ?? {};
   const tiers = snapshot?.tiers?.length ? snapshot.tiers : [...ENGAGEMENT_TIERS];
+  const waiting = counts.callback_waiting ?? 0;
 
   // Someone who replies is advanced to at least `Replied`, so the earlier stages
   // would only ever render an empty filter. Sliced from the shared vocabulary
@@ -170,7 +214,12 @@ export default function LeadsPage() {
     setOffset(0);
   };
 
-  const filtered = Boolean(stage || tier || search);
+  const toggleAwaiting = () => {
+    setAwaitingOnly(!awaitingOnly);
+    setOffset(0);
+  };
+
+  const filtered = Boolean(stage || tier || search || awaitingOnly);
 
   return (
     <div>
@@ -195,7 +244,36 @@ export default function LeadsPage() {
         </button>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        {/* First card, and the only one that is also a filter: everyone here was
+            promised a phone call by the assistant, so this is the one number on
+            the page that represents work already owed to a customer. */}
+        <button
+          type="button"
+          onClick={toggleAwaiting}
+          aria-pressed={awaitingOnly}
+          className={`rounded-2xl border p-5 text-left transition ${
+            awaitingOnly
+              ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
+              : waiting > 0
+                ? "border-amber-300 bg-amber-50 hover:border-amber-400 dark:border-amber-500/40 dark:bg-amber-500/10"
+                : "border-gray-200 bg-white hover:border-brand-300 dark:border-gray-800 dark:bg-white/[0.03]"
+          }`}
+        >
+          <p className="text-2xl font-semibold text-gray-800 dark:text-white/90">
+            {waiting}
+          </p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Waiting for a call
+          </p>
+          <p className="mt-1 text-[11px] leading-snug text-gray-400">
+            {awaitingOnly
+              ? "Showing only these — click to show every lead"
+              : waiting > 0
+                ? "Agreed to a callback. Click to show only these"
+                : "Nobody is waiting to be phoned"}
+          </p>
+        </button>
         {stats.map((card) => (
           <div
             key={card.label}
@@ -257,11 +335,17 @@ export default function LeadsPage() {
                 {tier}
               </Badge>
             ) : null}
+            {awaitingOnly ? (
+              <Badge color="warning" size="sm">
+                Waiting for a call
+              </Badge>
+            ) : null}
             {filtered && (
               <button
                 type="button"
                 onClick={() => {
                   setFilter("", "");
+                  setAwaitingOnly(false);
                   setSearchInput("");
                 }}
                 className="text-xs font-medium text-brand-500 hover:text-brand-600"
@@ -316,25 +400,35 @@ export default function LeadsPage() {
                 <th className="px-5 py-3 font-medium">Looking for</th>
                 <th className="px-5 py-3 font-medium">Replies</th>
                 <th className="px-5 py-3 font-medium">Last reply</th>
+                <th className="px-5 py-3 font-medium">Callback</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan={8} className="px-5 py-10 text-center text-gray-500">
                     Loading leads…
                   </td>
                 </tr>
               ) : !page || page.items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-gray-500">
-                    {filtered
-                      ? "No lead matches these filters."
-                      : "No one has replied yet. Once a customer answers on WhatsApp they appear here automatically."}
+                  <td colSpan={8} className="px-5 py-10 text-center text-gray-500">
+                    {awaitingOnly
+                      ? "Nobody is waiting for a call right now."
+                      : filtered
+                        ? "No lead matches these filters."
+                        : "No one has replied yet. Once a customer answers on WhatsApp they appear here automatically."}
                   </td>
                 </tr>
               ) : (
-                page.items.map((lead) => <LeadRow key={lead.id} lead={lead} />)
+                page.items.map((lead) => (
+                  <LeadRow
+                    key={lead.id}
+                    lead={lead}
+                    marking={markingId === lead.id}
+                    onMarkCalled={markCalled}
+                  />
+                ))
               )}
             </tbody>
           </table>
@@ -382,14 +476,23 @@ function whatsappHref(phone: string | null) {
   return digits.length >= 10 ? `https://wa.me/${digits}` : null;
 }
 
-function LeadRow({ lead }: { lead: Lead }) {
+function LeadRow({
+  lead,
+  marking,
+  onMarkCalled,
+}: {
+  lead: Lead;
+  marking: boolean;
+  onMarkCalled: (lead: Lead) => void;
+}) {
   const wants = [lead.bhk, lead.preferred_location, lead.budget_label]
     .filter(Boolean)
     .join(" · ");
   const chat = whatsappHref(lead.phone);
+  const waitingSince = lead.callback_requested_at;
 
   return (
-    <tr>
+    <tr className={waitingSince ? "bg-amber-50/50 dark:bg-amber-500/[0.04]" : undefined}>
       <td className="px-5 py-3">
         <p className="font-medium text-gray-800 dark:text-white/90">
           {lead.name || "Unnamed"}
@@ -406,6 +509,17 @@ function LeadRow({ lead }: { lead: Lead }) {
         ) : (
           <p className="text-xs text-gray-500">{lead.phone || lead.email || "—"}</p>
         )}
+        {/* The waiting marker sits with the name rather than in its own column:
+            it is a fact about the person, and it has to be legible in the same
+            glance that finds their number. */}
+        {waitingSince ? (
+          <p
+            className="mt-1.5 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+            title={`Asked for a call ${formatWhen(waitingSince)}`}
+          >
+            Waiting for a call · {formatSince(waitingSince)}
+          </p>
+        ) : null}
       </td>
       <td className="px-5 py-3">
         {lead.last_reply_text ? (
@@ -453,6 +567,21 @@ function LeadRow({ lead }: { lead: Lead }) {
       <td className="px-5 py-3 text-gray-500">{lead.reply_count}</td>
       <td className="px-5 py-3 text-gray-500" title={formatWhen(lead.last_reply_at)}>
         {formatSince(lead.last_reply_at)}
+      </td>
+      <td className="px-5 py-3">
+        {waitingSince ? (
+          <button
+            type="button"
+            disabled={marking}
+            onClick={() => onMarkCalled(lead)}
+            title="Record that you phoned them and take them off the call list"
+            className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
+          >
+            {marking ? "Saving…" : "Mark called"}
+          </button>
+        ) : (
+          <span className="text-gray-300 dark:text-gray-600">—</span>
+        )}
       </td>
     </tr>
   );
