@@ -6,6 +6,7 @@ import { useSidebar } from "../context/SidebarContext";
 import {
   BellIcon,
   CalenderIcon,
+  ChatIcon,
   ChevronDownIcon,
   GridIcon,
   HomeIcon,
@@ -32,13 +33,19 @@ const navItems: NavItem[] = [
     name: "Home",
     path: "/leads",
   },
+  // Inbox lives next to Home, not inside Campaign Studio: answering a customer
+  // is daily work, not a campaign setup step.
+  {
+    icon: <ChatIcon />,
+    name: "Messages",
+    path: "/messages",
+  },
   {
     icon: <ShootingStarIcon />,
     name: "Campaign Studio",
     subItems: [
       { name: "WhatsApp Outreach", path: "/outreach", pro: false, new: true },
       { name: "AI Calling", path: "/calls", pro: false, new: true },
-      { name: "Messages", path: "/messages", pro: false, new: true },
       { name: "Lead Pipeline", path: "/pipeline", pro: false, new: true },
       { name: "Campaigns", path: "/campaigns", pro: false },
       { name: "Contacts", path: "/contacts", pro: false },
@@ -62,11 +69,6 @@ const navItems: NavItem[] = [
     icon: <UserCircleIcon />,
     name: "User Profile",
     path: "/profile",
-  },
-  {
-    icon: <ShootingStarIcon />,
-    name: "Plans",
-    path: "/plans",
   },
 ];
 
