@@ -17,6 +17,7 @@
  * `tokens.tsx`, shared with the filter rail, the chat list and the transcript.
  */
 
+import { useState, type ReactNode } from "react";
 import Badge from "@/components/ui/badge/Badge";
 import {
   BAND_HINTS,
@@ -27,12 +28,9 @@ import {
 import { formatWhen, stageBadgeColor } from "@/lib/outreach";
 import {
   CalendarIcon,
-  DIVIDED,
   Dot,
   dotFor,
-  HINT,
   MetaRule,
-  Section,
 } from "@/components/messages/tokens";
 
 type Props = {
@@ -42,7 +40,6 @@ type Props = {
   appointments: AppointmentBrief[];
 };
 
-/** Keys the panel shows on its own, so the qualification block skips them. */
 const QUALIFICATION_SKIP = new Set([
   "purpose",
   "preferred_location",
@@ -55,6 +52,32 @@ const QUALIFICATION_SKIP = new Set([
   "customer_stage",
   "engagement_tier",
 ]);
+
+function Accordion({ title, defaultOpen = true, children }: { title: string, defaultOpen?: boolean, children: ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-b border-gray-100 dark:border-gray-800 last:border-0">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between px-5 py-3 text-left hover:bg-gray-50/50 dark:hover:bg-white/[0.02]"
+      >
+        <span className="text-xs font-bold uppercase tracking-wider text-gray-900 dark:text-white">
+          {title}
+        </span>
+        <svg
+          className={`h-4 w-4 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && <div className="px-5 pb-4 pt-1">{children}</div>}
+    </div>
+  );
+}
 
 export default function CustomerDetailsPanel({
   profile,
@@ -84,7 +107,6 @@ export default function CustomerDetailsPanel({
     ["City", profile.city],
     ["State", profile.state],
     ["Pincode", profile.pincode],
-    ["Assigned to", profile.assigned_to],
   ]);
 
   const listing = fields([
@@ -119,140 +141,111 @@ export default function CustomerDetailsPanel({
     .map(([key, value]) => [humanize(key), plain(value)] as [string, string]);
 
   return (
-    <div className={`${DIVIDED} text-sm`}>
-      {/* The score with its reasoning. A number nobody can question is a number
-          nobody trusts, so the AI's own explanation sits right under it. */}
-      <Section
-        title="How interested"
-        aside={
-          interest.updated_at ? (
-            <span className={HINT}>{formatWhen(interest.updated_at)}</span>
-          ) : undefined
-        }
-      >
-        {interest.score === null ? (
-          <p className="text-xs text-gray-500">
-            Not scored yet — the AI reads interest from a customer&apos;s reply, and this
-            one has not written back.
-          </p>
-        ) : (
-          <>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-semibold tabular-nums text-gray-800 dark:text-white/90">
-                {interest.score}
-                <span className="text-sm font-normal text-gray-400">/100</span>
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400">
-                <Dot className={dotFor(interest.band)} />
-                {interest.band_label || interest.band}
-              </span>
-            </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
-              <div
-                className="h-full rounded-full bg-brand-500"
-                style={{ width: `${Math.min(100, Math.max(0, interest.score))}%` }}
-              />
-            </div>
-            <p className="mt-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-              {interest.reason || BAND_HINTS[String(interest.band)] || ""}
+    <div className="flex min-h-0 flex-col bg-white dark:bg-gray-900/50">
+      <div className="border-b border-gray-100 bg-gray-50/50 p-5 dark:border-gray-800 dark:bg-white/[0.02]">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white">Customer Profile</h3>
+        <p className="mt-1 text-xs text-gray-500">Assigned to: <span className="font-medium text-gray-700 dark:text-gray-300">{profile.assigned_to || "Unassigned"}</span></p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        <Accordion title="Lead Overview" defaultOpen={true}>
+          {interest.score === null ? (
+            <p className="text-xs text-gray-500 mb-3">
+              Not scored yet — the AI reads interest from a customer&apos;s reply, and this
+              one has not written back.
             </p>
-            {interest.signals.length > 0 && (
-              <ul className="mt-2 space-y-1.5">
-                {interest.signals.map((signal) => (
-                  <li
-                    key={signal}
-                    className="flex gap-1.5 text-[11px] leading-snug text-gray-500"
-                  >
-                    <Dot className="mt-1 bg-gray-300 dark:bg-gray-600" />
-                    <span className="min-w-0">{signal}</span>
+          ) : (
+            <div className="mb-4">
+              <div className="flex items-baseline justify-between mb-1">
+                <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Interest Score</span>
+                <span className="text-sm font-bold text-gray-900 dark:text-white">{interest.score}/100</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                <div
+                  className="h-full rounded-full bg-brand-500"
+                  style={{ width: `${Math.min(100, Math.max(0, interest.score))}%` }}
+                />
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-gray-500 dark:text-gray-400">
+                {interest.reason || BAND_HINTS[String(interest.band)] || ""}
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <Badge color={stageBadgeColor(profile.customer_stage)} size="sm">
+              {profile.customer_stage}
+            </Badge>
+            <MetaRule />
+            <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400">
+              {profile.engagement_tier} engagement
+            </span>
+          </div>
+
+          {reach.length > 0 && <Rows rows={reach} />}
+        </Accordion>
+
+        <Accordion title="Requirements" defaultOpen={true}>
+          {requirement.length > 0 && <Rows rows={requirement} />}
+          {listing.length > 0 && (
+            <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+              <p className="mb-2 text-[10px] font-bold uppercase text-gray-400">Listing Inquiry</p>
+              <Rows rows={listing} />
+            </div>
+          )}
+          {extras.length > 0 && (
+            <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+              <p className="mb-2 text-[10px] font-bold uppercase text-gray-400">Established in Chat</p>
+              <Rows rows={extras} />
+            </div>
+          )}
+          {preferences.length > 0 && (
+            <div className="mt-3 border-t border-gray-100 pt-3 dark:border-gray-800">
+              <p className="mb-2 text-[10px] font-bold uppercase text-gray-400">Preferences</p>
+              <Rows rows={preferences} />
+            </div>
+          )}
+        </Accordion>
+
+        <Accordion title="Activity & History" defaultOpen={false}>
+          {appointments.length > 0 && (
+            <div className="mb-4">
+              <p className="mb-2 text-[10px] font-bold uppercase text-gray-400">Scheduled Appointments</p>
+              <ul className="space-y-2">
+                {appointments.map((appointment) => (
+                  <li key={appointment.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:border-gray-800 dark:bg-gray-900/50 dark:text-gray-400">
+                    <span className="flex items-center gap-1.5 font-semibold text-gray-900 dark:text-white">
+                      <CalendarIcon className="text-gray-400" />
+                      {formatWhen(appointment.scheduled_at)}
+                    </span>
+                    <span className="mt-1 block text-gray-500">{appointment.status}</span>
+                    {appointment.notes && <p className="mt-1 italic text-gray-500">{appointment.notes}</p>}
                   </li>
                 ))}
               </ul>
-            )}
-          </>
-        )}
-      </Section>
-
-      <Section title="Where they stand">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge color={stageBadgeColor(profile.customer_stage)} size="sm">
-            {profile.customer_stage}
-          </Badge>
-          <MetaRule />
-          <span className="text-[11px] text-gray-500">
-            {profile.engagement_tier} engagement
-          </span>
-          {profile.outreach_paused && (
-            <>
-              <MetaRule />
-              <span className="text-[11px] font-medium text-error-500">
-                Opted out of messages
-              </span>
-            </>
+            </div>
           )}
+          {history.length > 0 && <Rows rows={history} />}
+        </Accordion>
+      </div>
+
+      <div className="shrink-0 border-t border-gray-100 p-5 dark:border-gray-800 bg-gray-50/50 dark:bg-white/[0.02]">
+        <h4 className="text-[10px] font-bold uppercase text-gray-400 mb-3">Quick Actions</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+            Schedule Visit
+          </button>
+          <button type="button" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+            Update Stage
+          </button>
+          <button type="button" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+            Reassign
+          </button>
+          <button type="button" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-error-600 shadow-xs transition hover:bg-error-50 dark:border-gray-700 dark:bg-gray-800 dark:text-error-400 dark:hover:bg-error-900/20">
+            Opt Out
+          </button>
         </div>
-      </Section>
-
-      {appointments.length > 0 && (
-        <Section title="Scheduled">
-          <ul className="space-y-2">
-            {appointments.map((appointment) => (
-              <li key={appointment.id} className="text-xs text-gray-600 dark:text-gray-400">
-                <span className="inline-flex items-center gap-1.5 font-medium text-gray-800 dark:text-white/90">
-                  <CalendarIcon className="text-gray-400" />
-                  {formatWhen(appointment.scheduled_at)}
-                </span>
-                <span className="ml-1.5 text-gray-400">{appointment.status}</span>
-                {appointment.notes && <p className="mt-0.5 italic">{appointment.notes}</p>}
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {requirement.length > 0 && (
-        <Section title="What they want">
-          <Rows rows={requirement} />
-        </Section>
-      )}
-
-      {reach.length > 0 && (
-        <Section title="Contact">
-          <Rows rows={reach} />
-        </Section>
-      )}
-
-      {listing.length > 0 && (
-        <Section title="Listing they asked about">
-          <Rows rows={listing} />
-        </Section>
-      )}
-
-      {extras.length > 0 && (
-        <Section title="Established in chat">
-          <Rows rows={extras} />
-        </Section>
-      )}
-
-      {preferences.length > 0 && (
-        <Section title="Preferences">
-          <Rows rows={preferences} />
-        </Section>
-      )}
-
-      {history.length > 0 && (
-        <Section title="History">
-          <Rows rows={history} />
-        </Section>
-      )}
-
-      {profile.notes && (
-        <Section title="Notes">
-          <p className="whitespace-pre-wrap text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-            {profile.notes}
-          </p>
-        </Section>
-      )}
+      </div>
     </div>
   );
 }

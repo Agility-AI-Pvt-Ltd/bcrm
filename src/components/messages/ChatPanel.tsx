@@ -18,7 +18,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Badge from "@/components/ui/badge/Badge";
-import CustomerDetailsPanel from "@/components/messages/CustomerDetailsPanel";
 import {
   authorLabel,
   conversationStatusLabel,
@@ -45,6 +44,8 @@ type Props = {
   onLoadOlder: () => void;
   onSend: (text: string) => Promise<boolean>;
   onRefresh: () => void;
+  showDetails?: boolean;
+  onToggleDetails?: () => void;
 };
 
 export default function ChatPanel({
@@ -57,8 +58,9 @@ export default function ChatPanel({
   onLoadOlder,
   onSend,
   onRefresh,
+  showDetails,
+  onToggleDetails,
 }: Props) {
-  const [showDetails, setShowDetails] = useState(true);
   const scroller = useRef<HTMLDivElement | null>(null);
   const conversationId = detail?.thread.conversation_id ?? null;
 
@@ -99,13 +101,13 @@ export default function ChatPanel({
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
         {/* --- status header ------------------------------------------------- */}
-        <header className="border-b border-gray-100 px-5 py-4 dark:border-gray-800">
+        <header className="border-b border-gray-100 px-5 py-4 dark:border-gray-800 bg-white/50 dark:bg-white/[0.01]">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold text-gray-900 dark:text-white/90">
+              <h2 className="truncate text-lg font-bold text-gray-900 dark:text-white">
                 {thread.name}
               </h2>
-              <p className="mt-0.5 text-xs text-gray-500">
+              <p className="mt-0.5 text-[13px] font-medium text-gray-500">
                 {[thread.phone, thread.email].filter(Boolean).join(" · ") || "No contact details"}
               </p>
             </div>
@@ -113,85 +115,72 @@ export default function ChatPanel({
               <button
                 type="button"
                 onClick={onRefresh}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+                className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
               >
                 Refresh
               </button>
-              <button
-                type="button"
-                onClick={() => setShowDetails((value) => !value)}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.03] xl:hidden"
-              >
-                {showDetails ? "Hide details" : "Details"}
-              </button>
+              {onToggleDetails && (
+                <button
+                  type="button"
+                  onClick={onToggleDetails}
+                  className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 xl:hidden"
+                >
+                  {showDetails ? "Hide details" : "Details"}
+                </button>
+              )}
             </div>
           </div>
 
-          {/* The status line, grouped: where they stand, how interested they are,
-              what the conversation is doing, and what we have committed to. A rule
-              between the groups so six facts do not read as one run-on sentence. */}
-          <div className="mt-3 flex flex-wrap items-center gap-2.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge color={stageBadgeColor(thread.customer_stage)} size="sm">
-                {thread.customer_stage}
-              </Badge>
-              <span className="text-[11px] text-gray-500">
-                {thread.engagement_tier} engagement
+          <div className="mt-3.5 flex flex-wrap items-center gap-2">
+            <Badge color={stageBadgeColor(thread.customer_stage)} size="sm">
+              {thread.customer_stage}
+            </Badge>
+            <Badge color="light" size="sm">
+              {thread.engagement_tier}
+            </Badge>
+
+            <MetaRule />
+            <Badge color="light" size="sm">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Dot className={dotFor(thread.interest_band)} />
+                {interestLabel(thread.interest_score)}
               </span>
-            </div>
+            </Badge>
 
             <MetaRule />
-            <span
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 dark:text-gray-300"
-              title="How interested the AI reads this customer as, from 0 to 100"
-            >
-              <Dot className={dotFor(thread.interest_band)} />
-              {interestLabel(thread.interest_score)}
-            </span>
-
-            <MetaRule />
-            <span className="text-[11px] text-gray-500">
+            <Badge color="light" size="sm">
               {conversationStatusLabel(thread.status)}
-            </span>
+            </Badge>
 
             {thread.awaiting_reply && (
-              <>
-                <MetaRule />
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-warning-600 dark:text-warning-400">
+              <Badge color="warning" size="sm">
+                <span className="flex items-center gap-1.5 font-semibold">
                   <Dot className="bg-warning-500" />
                   {waitingLabel(thread.waiting_since) || "waiting on you"}
                 </span>
-              </>
+              </Badge>
             )}
 
             {thread.scheduled_at && (
-              <>
-                <MetaRule />
-                <span className="inline-flex items-center gap-1.5 text-[11px] text-gray-500">
+              <Badge color="light" size="sm">
+                <span className="flex items-center gap-1.5">
                   <CalendarIcon />
                   {formatWhen(thread.scheduled_at)}
                 </span>
-              </>
+              </Badge>
             )}
           </div>
-
-          {interest.reason && (
-            <p className="mt-2.5 max-w-3xl text-[11px] leading-snug text-gray-500">
-              <span className="font-medium text-gray-600 dark:text-gray-400">Why: </span>
-              {interest.reason}
-            </p>
-          )}
         </header>
 
         {/* --- transcript --------------------------------------------------- */}
-        <div ref={scroller} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+        <div ref={scroller} className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-6 bg-gray-50/50 dark:bg-transparent">
           {hasMore && (
-            <div className="text-center">
+            <div className="text-center pb-4">
               <button
                 type="button"
                 onClick={onLoadOlder}
                 disabled={loadingOlder}
-                className="rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 disabled:opacity-50 dark:border-gray-700 dark:text-gray-400"
+                className="rounded-full border border-gray-200 bg-white px-4 py-1.5 text-[11px] font-semibold text-gray-600 shadow-xs transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
               >
                 {loadingOlder ? "Loading…" : "Load earlier messages"}
               </button>
@@ -206,9 +195,7 @@ export default function ChatPanel({
             </p>
           ) : (
             groups.map((group) => (
-              <div key={group.day} className="space-y-3">
-                {/* A day is a category too, so it gets the same treatment: a label
-                    with the rule running through it. */}
+              <div key={group.day} className="space-y-4">
                 <SpanningLabel>{group.day}</SpanningLabel>
                 {group.items.map((message) => (
                   <Bubble key={message.id} message={message} />
@@ -219,8 +206,6 @@ export default function ChatPanel({
         </div>
 
         {/* --- composer ----------------------------------------------------- */}
-        {/* Keyed by conversation so switching chats clears the box by remounting,
-            which is cheaper and less error-prone than resetting it in an effect. */}
         <Composer
           key={conversationId ?? "none"}
           blocked={blocked}
@@ -229,31 +214,10 @@ export default function ChatPanel({
           onSend={onSend}
         />
       </div>
-
-      {/* --- profile rail --------------------------------------------------- */}
-      <aside
-        className={`w-80 shrink-0 overflow-y-auto border-l border-gray-100 dark:border-gray-800 ${
-          showDetails ? "block" : "hidden"
-        } xl:block`}
-      >
-        <CustomerDetailsPanel
-          profile={profile}
-          interest={interest}
-          qualification={detail.qualification}
-          appointments={detail.appointments}
-        />
-      </aside>
     </div>
   );
 }
 
-/**
- * The one place a human types into a customer's WhatsApp.
- *
- * `blocked` carries the reason from the backend rather than a boolean, so the
- * disabled state can always explain itself — an opt-out and a closed 24-hour
- * window look the same to the agent otherwise.
- */
 function Composer({
   blocked,
   sending,
@@ -275,19 +239,17 @@ function Composer({
   };
 
   return (
-    <div className="border-t border-gray-100 px-5 py-3 dark:border-gray-800">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <span
-          className={`text-[11px] ${blocked ? "text-error-500" : "text-gray-500"}`}
-          title={windowState.reason}
-        >
-          {blocked || windowLabel(windowState)}
-        </span>
-        <span className="text-[11px] text-gray-400">
-          The AI keeps replying after you send
-        </span>
-      </div>
-      <div className="flex items-end gap-2">
+    <div className="border-t border-gray-200 bg-white px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
+      {blocked && (
+        <div className="mb-2 rounded-md bg-error-50 px-3 py-2 text-[11px] text-error-700 dark:bg-error-500/10 dark:text-error-400">
+          {blocked}
+        </div>
+      )}
+      {!blocked && windowState.reason && (
+        <div className="mb-2 text-[11px] text-gray-500">{windowLabel(windowState)}</div>
+      )}
+      
+      <div className="flex items-end gap-2 rounded-xl border border-gray-300 bg-white focus-within:border-brand-500 focus-within:ring-3 focus-within:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-950 dark:focus-within:border-brand-600 transition-shadow">
         <textarea
           value={draft}
           onChange={(event) => setDraft(event.target.value.slice(0, MAX_LENGTH))}
@@ -297,27 +259,34 @@ function Composer({
               void submit();
             }
           }}
-          rows={2}
+          rows={1}
           disabled={Boolean(blocked)}
           placeholder={
             blocked
-              ? "You cannot type a message to this customer right now"
-              : "Write the message you want sent to their WhatsApp…"
+              ? "Cannot send messages"
+              : "Reply to customer..."
           }
-          className="min-h-[44px] flex-1 resize-y rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-50 dark:border-gray-700 dark:bg-transparent dark:text-gray-300 dark:disabled:bg-white/[0.03]"
+          className="min-h-[44px] flex-1 resize-y bg-transparent px-4 py-3 text-[14px] text-gray-800 placeholder:text-gray-400 focus:outline-none disabled:cursor-not-allowed dark:text-gray-200"
         />
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={!canSend}
-          className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {sending ? "Sending…" : "Send"}
-        </button>
+        <div className="flex shrink-0 items-center gap-1 p-1.5">
+          <button
+            type="button"
+            disabled={!canSend}
+            onClick={() => void submit()}
+            className="flex h-8 items-center justify-center rounded-lg bg-brand-500 px-4 text-xs font-semibold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 dark:disabled:bg-gray-800"
+          >
+            {sending ? "Sending…" : "Send"}
+          </button>
+        </div>
       </div>
-      <p className="mt-1 text-[11px] text-gray-400">
-        Enter sends · Shift+Enter adds a line · {draft.length}/{MAX_LENGTH}
-      </p>
+      <div className="mt-1.5 flex items-center justify-between px-1">
+        <p className="text-[10px] text-gray-400">
+          Enter to send, Shift+Enter for new line
+        </p>
+        <p className="text-[10px] text-gray-400">
+          {draft.length}/{MAX_LENGTH}
+        </p>
+      </div>
     </div>
   );
 }
@@ -325,40 +294,43 @@ function Composer({
 function Bubble({ message }: { message: InboxMessage }) {
   const inbound = message.author === "customer";
   const agent = message.author === "agent";
+  
+  // Refined bubble styling
   const tone = inbound
-    ? "bg-gray-100 text-gray-800 dark:bg-white/[0.06] dark:text-gray-200"
+    ? "bg-white border border-gray-200 text-gray-800 shadow-xs dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200 rounded-bl-sm"
     : agent
-      ? "bg-brand-500 text-white"
-      : "bg-brand-50 text-gray-800 dark:bg-brand-500/15 dark:text-gray-100";
+      ? "bg-brand-600 text-white shadow-xs rounded-br-sm"
+      : "bg-gray-100 text-gray-700 border border-transparent dark:bg-gray-800 dark:text-gray-300 rounded-br-sm"; // AI styling
+
   const kind = message.kind ? MESSAGE_KIND_LABELS[message.kind] || message.kind : "";
 
   return (
-    <div className={`flex ${inbound ? "justify-start" : "justify-end"}`}>
-      <div className="max-w-[78%]">
-        <div className={`rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${tone}`}>
+    <div className={`flex w-full ${inbound ? "justify-start" : "justify-end"}`}>
+      <div className="max-w-[75%] flex flex-col">
+        <div className={`rounded-2xl px-4 py-2.5 text-[14px] leading-relaxed ${tone}`}>
           {message.text ? (
             <p className="whitespace-pre-wrap break-words">{message.text}</p>
           ) : (
-            <p className="italic opacity-70">
-              {message.media_url ? "Sent an attachment" : `(${message.message_type})`}
+            <p className="italic opacity-80">
+              {message.media_url ? "📎 Attachment sent" : `(${message.message_type})`}
             </p>
           )}
         </div>
         <div
-          className={`mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-gray-400 ${
-            inbound ? "" : "justify-end"
+          className={`mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-gray-400 ${
+            inbound ? "justify-start ml-1" : "justify-end mr-1"
           }`}
         >
-          <span className={agent ? "font-medium text-brand-500" : ""}>
+          <span className={`font-semibold ${agent ? "text-brand-600 dark:text-brand-400" : ""}`}>
             {authorLabel(message)}
           </span>
-          {kind && <span>· {kind}</span>}
-          <span title={formatWhen(message.created_at)}>· {formatSince(message.created_at)}</span>
+          {kind && <span className="opacity-75">· {kind}</span>}
+          <span className="opacity-75" title={formatWhen(message.created_at)}>· {formatSince(message.created_at)}</span>
           {message.delivery_status && !inbound && (
-            <span title={message.delivery_error || undefined}>· {message.delivery_status}</span>
+            <span className="opacity-75" title={message.delivery_error || undefined}>· {message.delivery_status}</span>
           )}
           {message.delivery_error && (
-            <span className="text-error-500" title={message.delivery_error}>
+            <span className="font-semibold text-error-500" title={message.delivery_error}>
               · failed
             </span>
           )}

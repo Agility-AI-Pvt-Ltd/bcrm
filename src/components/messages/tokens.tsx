@@ -141,9 +141,9 @@ export function Pill({
       onClick={onClick}
       title={hint}
       aria-pressed={active}
-      className={`inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-xs transition ${
+      className={`inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-xs transition ${
         active
-          ? "border-brand-500 bg-brand-50 font-medium text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+          ? "border-brand-500 bg-brand-50 font-medium text-brand-600 dark:bg-brand-500/10 dark:text-brand-400 shadow-xs"
           : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.03]"
       }`}
     >
