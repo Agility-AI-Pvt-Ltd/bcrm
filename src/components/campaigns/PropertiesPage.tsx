@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
@@ -9,6 +10,8 @@ import {
   getPropertyStats,
   listProperties,
   propertyStatusLabel,
+  PROPERTY_VIEW_LABELS,
+  type PropertyView,
   type PropertyRecord,
   type PropertyStats,
 } from "@/lib/properties";
@@ -67,23 +70,36 @@ export default function PropertiesPage() {
     <div>
       <PageBreadcrumb pageTitle="Properties" />
 
+      {/* Each tile links to the rows it counted. The server derives both from
+          one predicate, so the number here and the total on the next page
+          cannot drift apart. */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
-        {[
-          [String(stats.active_listings), "Active listings"],
-          [String(stats.new_this_month), "New this month"],
-          [String(stats.reserved), "Reserved"],
-          [String(stats.sold_this_quarter), "Sold this quarter"],
-        ].map(([value, label]) => (
-          <div
+        {(
+          [
+            [String(stats.active_listings), "active"],
+            [String(stats.new_this_month), "new-this-month"],
+            [String(stats.reserved), "reserved"],
+            [String(stats.sold_this_quarter), "sold"],
+          ] as Array<[string, PropertyView]>
+        ).map(([value, view]) => {
+          const label = PROPERTY_VIEW_LABELS[view];
+          return (
+          <Link
             key={label}
-            className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]"
+            href={`/properties/list?view=${view}&page=1`}
+            aria-label={`${label}: ${value}. View all`}
+            className="group block rounded-2xl border border-gray-200 bg-white p-5 transition hover:border-brand-400 hover:shadow-theme-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-brand-500"
           >
             <p className="text-2xl font-semibold text-gray-800 dark:text-white/90">
               {loading ? "—" : value}
             </p>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{label}</p>
-          </div>
-        ))}
+            <p className="mt-2 text-xs font-medium text-brand-500 opacity-0 transition group-hover:opacity-100">
+              View all →
+            </p>
+          </Link>
+          );
+        })}
       </div>
 
       <PropertySheetsPanel onSynced={load} />

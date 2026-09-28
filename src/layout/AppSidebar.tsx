@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
   BellIcon,
+  BoxCubeIcon,
   CalenderIcon,
   ChatIcon,
   ChevronDownIcon,
@@ -12,6 +13,7 @@ import {
   HomeIcon,
   HorizontaLDots,
   ShootingStarIcon,
+  TimeIcon,
   UserCircleIcon,
 } from "../icons/index";
 
@@ -40,16 +42,23 @@ const navItems: NavItem[] = [
     name: "Messages",
     path: "/messages",
   },
+  // Inventory, not a campaign step. Properties is looked at constantly — while
+  // answering a customer, while building a campaign, while checking a price —
+  // so it sits with the other daily-reference pages rather than one click down
+  // inside a group about setting campaigns up.
+  {
+    icon: <BoxCubeIcon />,
+    name: "Properties",
+    path: "/properties",
+  },
   {
     icon: <ShootingStarIcon />,
     name: "Campaign Studio",
     subItems: [
       { name: "WhatsApp Outreach", path: "/outreach", pro: false, new: true },
       { name: "AI Calling", path: "/calls", pro: false, new: true },
-      { name: "Lead Pipeline", path: "/pipeline", pro: false, new: true },
       { name: "Campaigns", path: "/campaigns", pro: false },
       { name: "Contacts", path: "/contacts", pro: false },
-      { name: "Properties", path: "/properties", pro: false },
     ],
   },
   // Deliberately top-level, not inside Campaign Studio: notifications span every
@@ -64,6 +73,15 @@ const navItems: NavItem[] = [
     icon: <CalenderIcon />,
     name: "Calendar",
     path: "/calendar",
+  },
+  // Not a campaign step either: a lead can go quiet weeks after the campaign
+  // that first messaged it finished, and still needs following up. It runs on
+  // its own schedule, so it gets its own entry rather than living under
+  // Campaign Studio.
+  {
+    icon: <TimeIcon />,
+    name: "Follow-ups",
+    path: "/follow-ups",
   },
   {
     icon: <UserCircleIcon />,
@@ -99,7 +117,14 @@ const AppSidebar: React.FC = () => {
   const [subMenuHeight, setSubMenuHeight] = useState<Record<number, number>>({});
   const subMenuRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
-  const isActive = useCallback((path: string) => path === pathname, [pathname]);
+  // Exact match, or a child route of it. Properties now has `/properties/list`
+  // behind its stat tiles, and an exact-only match left the menu unhighlighted
+  // there — the user is plainly still in Properties. The trailing slash matters:
+  // without it `/lead` would also light up on `/leads`.
+  const isActive = useCallback(
+    (path: string) => pathname === path || pathname.startsWith(`${path}/`),
+    [pathname],
+  );
 
   const handleSubmenuToggle = (index: number) => {
     setOverride({ pathname, index: openIndex === index ? null : index });

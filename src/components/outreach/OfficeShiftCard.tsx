@@ -34,14 +34,38 @@ import {
   OFFICE_TASK_LABELS,
   type OfficeShiftResult,
   type OfficeSnapshot,
+  type ShiftKind,
 } from "@/lib/outreach";
+
+/** Wording per shift. The mechanics are identical; only the story differs. */
+const COPY: Record<
+  ShiftKind,
+  { heading: string; empty: string; run: string; schedule: string }
+> = {
+  campaign: {
+    heading: "Campaign shift, every 6 hours",
+    empty:
+      "Nothing outstanding. Upload a contact list and create a campaign to give the AI work.",
+    run: "Run a shift now",
+    schedule: "Keep it on schedule",
+  },
+  followup: {
+    heading: "Follow-up shift, every 6 hours",
+    empty: "No leads need following up right now.",
+    run: "Follow up now",
+    schedule: "Keep it on schedule",
+  },
+};
 
 type Props = {
   /** Called after a shift runs, so the parent can reload campaigns or leads. */
   onWorkDone?: () => void;
+  /** Which shift this card drives. Defaults to campaign. */
+  kind?: ShiftKind;
 };
 
-export default function OfficeShiftCard({ onWorkDone }: Props) {
+export default function OfficeShiftCard({ onWorkDone, kind = "campaign" }: Props) {
+  const copy = COPY[kind];
   const [snapshot, setSnapshot] = useState<OfficeSnapshot | null>(null);
   const [result, setResult] = useState<OfficeShiftResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,7 +77,7 @@ export default function OfficeShiftCard({ onWorkDone }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setSnapshot(await getOfficeSnapshot());
+      setSnapshot(await getOfficeSnapshot(kind));
       setFailure("");
     } catch (error) {
       // Drop the stale snapshot rather than keeping numbers we can no longer
@@ -63,7 +87,9 @@ export default function OfficeShiftCard({ onWorkDone }: Props) {
     } finally {
       setLoading(false);
     }
-  }, []);
+    // `kind` picks the endpoint, so a card switched between shifts must refetch
+    // rather than keep showing the other shift's queue.
+  }, [kind]);
 
   useEffect(() => {
     void load();
@@ -76,7 +102,7 @@ export default function OfficeShiftCard({ onWorkDone }: Props) {
     // sitting under a fresh failure would read as if both had just happened.
     setNotice("");
     try {
-      const shift = await runOfficeShift();
+      const shift = await runOfficeShift(undefined, kind);
       setResult(shift);
       setNotice(shift.summary);
       setFailure("");
@@ -93,7 +119,7 @@ export default function OfficeShiftCard({ onWorkDone }: Props) {
     setScheduling(true);
     setNotice("");
     try {
-      const outcome = await scheduleOfficeShift();
+      const outcome = await scheduleOfficeShift(kind);
       setNotice(outcome.message);
     } catch (error) {
       setFailure(failureText(error, "Could not register the schedule."));
@@ -129,7 +155,7 @@ export default function OfficeShiftCard({ onWorkDone }: Props) {
             Works like a person in an office
           </p>
           <h2 className="mt-1 font-semibold text-gray-900 dark:text-white/90">
-            AI shift, every 6 hours
+            {copy.heading}
           </h2>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             It looks at what is outstanding, decides an order, and does the work.
@@ -163,7 +189,7 @@ export default function OfficeShiftCard({ onWorkDone }: Props) {
         <>
           {outstanding.length === 0 ? (
             <p className="rounded-xl border border-dashed border-gray-300 px-4 py-6 text-center text-sm text-gray-500 dark:border-gray-700">
-              Nothing outstanding. Upload a contact list to give the AI work.
+              {copy.empty}
             </p>
           ) : (
             <div className="grid grid-cols-2 gap-2">
@@ -224,7 +250,7 @@ export default function OfficeShiftCard({ onWorkDone }: Props) {
           onClick={() => void runNow()}
           className="inline-flex flex-1 items-center justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
-          {running ? "Working…" : "Run a shift now"}
+          {running ? "Working…" : copy.run}
         </button>
         <button
           type="button"
@@ -232,7 +258,7 @@ export default function OfficeShiftCard({ onWorkDone }: Props) {
           onClick={() => void schedule()}
           className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.03]"
         >
-          {scheduling ? "Registering…" : "Keep it on schedule"}
+          {scheduling ? "Registering…" : copy.schedule}
         </button>
       </div>
 
