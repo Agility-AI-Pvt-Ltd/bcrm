@@ -4,12 +4,6 @@ import { FormEvent, useEffect, useState } from "react";
 import ProfileExtractAssistant from "@/components/user-profile/ProfileExtractAssistant";
 import { ApiError, fetchMe, updateProfile } from "@/lib/auth";
 import { useStoredUser } from "@/hooks/useStoredUser";
-import {
-  PROFILE_AVATARS,
-  profileAvatarName,
-  resolveProfileAvatar,
-  type ProfileAvatar,
-} from "@/lib/avatars";
 
 const fieldClass =
   "h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm dark:border-gray-700 dark:text-white/90";
@@ -18,11 +12,6 @@ const areaClass =
 
 export default function EditProfileForm() {
   const user = useStoredUser();
-  // `picked` is the unsaved choice sitting on top of what the server has. Clearing
-  // it after a save hands control back to the stored value — no copy of the avatar
-  // to keep in sync, so the preview here and the header can never disagree.
-  const [picked, setPicked] = useState<ProfileAvatar | null>(null);
-  const avatar = picked ?? resolveProfileAvatar(user?.avatar);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -59,9 +48,7 @@ export default function EditProfileForm() {
         address: String(form.get("address") || "").trim() || null,
         office_address: String(form.get("office_address") || "").trim() || null,
         bio: String(form.get("bio") || "").trim() || null,
-        avatar,
       });
-      setPicked(null);
       setNotice("Profile updated.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Profile update failed.");
@@ -79,7 +66,6 @@ export default function EditProfileForm() {
         onApplied={() => {
           // The apply call already cached the new user; this just re-mounts the
           // form so the defaultValue inputs pick the new values up.
-          setPicked(null);
           setFormKey((value) => value + 1);
           setNotice("AI updates applied to your profile.");
         }}
@@ -114,65 +100,6 @@ export default function EditProfileForm() {
           onSubmit={(event) => void onSave(event)}
           className="space-y-5"
         >
-          <div className="rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-              <div className="mx-auto h-20 w-20 shrink-0 overflow-hidden rounded-full border border-gray-200 bg-white dark:border-gray-700 sm:mx-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={avatar}
-                  alt={`Selected avatar: ${profileAvatarName(avatar)}`}
-                  width={80}
-                  height={80}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-                  Profile avatar
-                </p>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Pick a character — currently{" "}
-                  <span className="font-medium text-gray-700 dark:text-gray-300">
-                    {profileAvatarName(avatar)}
-                  </span>
-                  . Uploads are not supported.
-                </p>
-                <div className="mt-3 grid grid-cols-6 gap-2 sm:grid-cols-8 md:grid-cols-12">
-                  {PROFILE_AVATARS.map((option) => {
-                    const selected = option === avatar;
-                    const name = profileAvatarName(option);
-                    return (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => setPicked(option)}
-                        // The path used to be read out as "Select avatar-01.svg",
-                        // which describes the file rather than the character.
-                        aria-label={`Select ${name} avatar`}
-                        aria-pressed={selected}
-                        title={name}
-                        className={`relative overflow-hidden rounded-full border-2 transition ${
-                          selected
-                            ? "border-brand-500 ring-2 ring-brand-500/30"
-                            : "border-transparent hover:border-gray-300 dark:hover:border-gray-600"
-                        }`}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={option}
-                          alt=""
-                          width={48}
-                          height={48}
-                          className="h-10 w-10 object-cover sm:h-11 sm:w-11"
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <label className="block text-sm">
               <span className="mb-1.5 block text-gray-500">First name</span>

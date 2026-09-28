@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ChatPanel from "@/components/messages/ChatPanel";
+import CustomerDetailsPanel from "@/components/messages/CustomerDetailsPanel";
 import MessageFilters from "@/components/messages/MessageFilters";
 import ThreadList from "@/components/messages/ThreadList";
 import { FIELD, LABEL } from "@/components/messages/tokens";
@@ -76,6 +77,7 @@ export default function MessagesWorkspace() {
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [detail, setDetail] = useState<InboxThreadDetail | null>(null);
+  const [showDetails, setShowDetails] = useState(true);
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
@@ -391,36 +393,55 @@ export default function MessagesWorkspace() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[380px_minmax(0,1fr)]">
+      <div className="sticky top-0 z-10 mb-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <MessageFilters
+          filters={filters}
+          sort={sort}
+          vocabulary={vocabulary}
+          activeCount={activeCount}
+          searchInput={searchInput}
+          onSearchInput={setSearchInput}
+          onPatch={patchFilters}
+          onSort={(next) => {
+            setSort(next);
+            setOffset(0);
+          }}
+          onClear={clearFilters}
+        />
+      </div>
+
+      <div
+        className={`grid grid-cols-1 gap-5 ${
+          showDetails && detail
+            ? "xl:grid-cols-[340px_minmax(0,1fr)_340px]"
+            : "lg:grid-cols-[340px_minmax(0,1fr)]"
+        }`}
+      >
         {/* --- list column ---------------------------------------------------- */}
-        <div className="flex max-h-[calc(100vh-13rem)] min-h-[32rem] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-          {/* Two scroll regions, and their height budgets only make sense read
-              together. The filter rail is around twice this column's height, so
-              it has to scroll — and a flex child cannot scroll unless it is also
-              allowed to shrink, which is what `min-h-0` permits. Without it the
-              rail keeps its full content height and the column's
-              `overflow-hidden` silently clips the last filters off the bottom
-              with no way to reach them. The cap stops the rail from eating a tall
-              screen; the list's floor stops it being squeezed to nothing on a
-              short one; the pager never shrinks at all. */}
-          <div className="max-h-[26rem] min-h-0 overflow-y-auto border-b border-gray-200 dark:border-gray-800">
-            <MessageFilters
-              filters={filters}
-              sort={sort}
-              vocabulary={vocabulary}
-              activeCount={activeCount}
-              searchInput={searchInput}
-              onSearchInput={setSearchInput}
-              onPatch={patchFilters}
-              onSort={(next) => {
-                setSort(next);
-                setOffset(0);
-              }}
-              onClear={clearFilters}
-            />
+        <div className="flex max-h-[calc(100vh-13rem)] min-h-[32rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+                {filtered ? "Matching conversations" : "All conversations"}
+              </p>
+              <p className="mt-0.5 text-[11px] text-gray-500">
+                {loadingThreads
+                  ? "Updating results…"
+                  : `${total} conversation${total === 1 ? "" : "s"}`}
+              </p>
+            </div>
+            {filtered && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700 dark:text-brand-400"
+              >
+                Clear filters
+              </button>
+            )}
           </div>
 
-          <div className="min-h-[12rem] flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             <ThreadList
               threads={threads}
               loading={loadingThreads}
@@ -472,8 +493,22 @@ export default function MessagesWorkspace() {
             onRefresh={() => {
               if (activeId) void openThread(activeId);
             }}
+            showDetails={showDetails}
+            onToggleDetails={() => setShowDetails(!showDetails)}
           />
         </div>
+
+        {/* --- details column ------------------------------------------------- */}
+        {showDetails && detail && (
+          <div className="hidden max-h-[calc(100vh-13rem)] min-h-[32rem] flex-col overflow-y-auto rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:flex">
+            <CustomerDetailsPanel
+              profile={detail.profile}
+              interest={detail.interest}
+              qualification={detail.qualification}
+              appointments={detail.appointments}
+            />
+          </div>
+        )}
       </div>
 
       {/* --- group builder --------------------------------------------------- */}

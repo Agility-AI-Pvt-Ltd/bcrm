@@ -13,6 +13,7 @@ import {
   type PropertyStats,
 } from "@/lib/properties";
 import PropertyImportPanel from "@/components/campaigns/PropertyImportPanel";
+import PropertySheetsPanel from "@/components/campaigns/PropertySheetsPanel";
 
 const PAGE_SIZE = 50;
 
@@ -85,6 +86,8 @@ export default function PropertiesPage() {
         ))}
       </div>
 
+      <PropertySheetsPanel onSynced={load} />
+
       <PropertyImportPanel onImported={load} />
 
       <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
@@ -114,19 +117,20 @@ export default function PropertiesPage() {
                 <th className="px-5 py-3 font-medium">BHK</th>
                 <th className="px-5 py-3 font-medium">Listing</th>
                 <th className="px-5 py-3 font-medium">Price</th>
+                <th className="px-5 py-3 font-medium">Source</th>
                 <th className="px-5 py-3 font-medium">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={7} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
                     Loading properties…
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={7} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
                     No properties in the database for this organization.
                   </td>
                 </tr>
@@ -147,6 +151,14 @@ export default function PropertiesPage() {
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 text-gray-500 dark:text-gray-400">
                       {formatPropertyPrice(property)}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4">
+                      <Badge
+                        color={property.source === "sheet" ? "info" : "light"}
+                        size="sm"
+                      >
+                        {property.source === "sheet" ? "Sheet" : "Manual"}
+                      </Badge>
                     </td>
                     <td className="px-5 py-4">
                       <Badge color={statusColor(String(property.status))} size="sm">

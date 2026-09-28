@@ -31,6 +31,12 @@ export type PropertyRecord = {
   amenities: string[];
   nearby_places: NearbyPlace[];
   image_urls: string[];
+  /** "sheet" for listings mirrored from a connected spreadsheet. */
+  source: "manual" | "sheet" | "import" | string;
+  sheet_connection_id: string | null;
+  /** Spreadsheet columns that map to no field; searched by the bot as-is. */
+  extra_fields: Record<string, string>;
+  last_synced_at: string | null;
   created_at: string;
   updated_at: string;
 };

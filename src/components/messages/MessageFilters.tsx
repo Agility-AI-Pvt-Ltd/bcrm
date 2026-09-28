@@ -32,16 +32,14 @@ import {
   type InboxSort,
 } from "@/lib/inbox";
 import { CUSTOMER_STAGES, ENGAGEMENT_TIERS } from "@/lib/outreach";
+import { useState } from "react";
 import {
-  DIVIDED,
   dotFor,
   FIELD,
-  HINT,
   LABEL,
   Pill,
   PillRow,
   SearchIcon,
-  Section,
   SELECT,
   stageDot,
 } from "@/components/messages/tokens";
@@ -77,6 +75,8 @@ export default function MessageFilters({
   onSort,
   onClear,
 }: Props) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const stages = vocabulary?.stages?.length ? vocabulary.stages : [...CUSTOMER_STAGES];
   const tiers = vocabulary?.tiers?.length ? vocabulary.tiers : [...ENGAGEMENT_TIERS];
   const bands = vocabulary?.bands?.length
@@ -107,203 +107,214 @@ export default function MessageFilters({
     onPatch({ [key]: filters[key] ? undefined : true });
 
   return (
-    <div className={DIVIDED}>
-      {/* Search sits above the first rule: it narrows everything below it. */}
-      <div className="flex items-center gap-2 px-4 py-3.5">
-        <div className="relative min-w-0 flex-1">
+    <div className="flex flex-col gap-4">
+      {/* Top row: Search, Sort, Reset */}
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-1 border-b border-gray-100 dark:border-gray-800">
+        <div className="relative min-w-[280px] max-w-lg flex-1">
           <SearchIcon />
           <input
             type="search"
             value={searchInput}
             onChange={(event) => onSearchInput(event.target.value)}
             placeholder="Search name, phone or message"
-            className={`${FIELD} pl-9`}
+            className={`${FIELD} pl-9 bg-gray-50 dark:bg-gray-800/50`}
           />
         </div>
-        <button
-          type="button"
-          onClick={onClear}
-          disabled={activeCount === 0}
-          className="h-9 shrink-0 rounded-lg border border-gray-300 px-3 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.03]"
-        >
-          Reset{activeCount > 0 ? ` (${activeCount})` : ""}
-        </button>
-      </div>
 
-      <Section title="Sort by">
-        <select
-          value={sort}
-          onChange={(event) => onSort(event.target.value)}
-          aria-label="Sort chats by"
-          className={SELECT}
-        >
-          {sorts.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <p className={`mt-1.5 ${HINT}`}>
-          {SORT_HINTS[sort] || sorts.find((item) => item.value === sort)?.hint || ""}
-        </p>
-      </Section>
-
-      {/* Interest first — it is the answer to "who do I message today". */}
-      <Section title="Interest level" hint="How likely they are to buy, scored from the chat">
-        <PillRow>
-          {bands.map((band) => (
-            <Pill
-              key={band.value}
-              label={band.label}
-              hint={band.hint}
-              dot={dotFor(band.value)}
-              active={filters.band === band.value}
-              onClick={() => toggle("band", band.value)}
-            />
-          ))}
-        </PillRow>
-      </Section>
-
-      <Section title="Show only">
-        <PillRow>
-          <Pill
-            label="Waiting on you"
-            hint="They wrote last and nobody has answered"
-            active={Boolean(filters.awaiting)}
-            onClick={() => toggleFlag("awaiting")}
-          />
-          <Pill
-            label="Replied"
-            hint="Only chats where a real person wrote back"
-            active={Boolean(filters.replied)}
-            onClick={() => toggleFlag("replied")}
-          />
-          <Pill
-            label="Has a date"
-            hint="A site visit or follow-up is on the calendar"
-            active={Boolean(filters.scheduled)}
-            onClick={() => toggleFlag("scheduled")}
-          />
-          <Pill
-            label="Opted out"
-            hint="Customers who asked us to stop"
-            active={filters.paused === true}
-            onClick={() => onPatch({ paused: filters.paused === true ? undefined : true })}
-          />
-        </PillRow>
-      </Section>
-
-      <Section title="Stage">
-        <PillRow>
-          {stages.map((name) => (
-            <Pill
-              key={name}
-              label={name}
-              dot={stageDot(name)}
-              active={filters.stage === name}
-              onClick={() => toggle("stage", name)}
-            />
-          ))}
-        </PillRow>
-      </Section>
-
-      <Section title="More filters">
-        <div className="grid grid-cols-2 gap-x-3 gap-y-3">
-          <label className="block">
-            <span className={`${LABEL} mb-1`}>Engagement</span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className={`${LABEL} mb-0`}>Sort</span>
             <select
-              value={filters.tier || ""}
-              onChange={(event) => onPatch({ tier: event.target.value || undefined })}
-              className={SELECT}
+              value={sort}
+              onChange={(event) => onSort(event.target.value)}
+              aria-label="Sort chats by"
+              className={`${SELECT} w-auto min-w-[140px]`}
             >
-              <option value="">Any</option>
-              {tiers.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span
-              className={`${LABEL} mb-1`}
-              title="WhatsApp only allows a message you type within 24 hours of their last reply"
-            >
-              Can text now
-            </span>
-            <select
-              value={filters.window || ""}
-              onChange={(event) => onPatch({ window: event.target.value || undefined })}
-              className={SELECT}
-            >
-              <option value="">Any</option>
-              {windows.map((option) => (
+              {sorts.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
             </select>
-          </label>
+          </div>
 
-          <label className="col-span-2 block">
-            <span className={`${LABEL} mb-1`}>Gone quiet for</span>
-            <select
-              value={filters.quiet_days ? String(filters.quiet_days) : ""}
-              onChange={(event) =>
-                onPatch({
-                  quiet_days: event.target.value ? Number(event.target.value) : undefined,
-                })
-              }
-              className={SELECT}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className={`h-9 shrink-0 rounded-lg border px-4 text-xs font-medium transition ${
+                showAdvanced || activeCount > 0
+                  ? "border-brand-500 bg-brand-50 text-brand-600 dark:border-brand-500/50 dark:bg-brand-500/10 dark:text-brand-400"
+                  : "border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.03]"
+              }`}
             >
-              <option value="">Any</option>
-              {QUIET_CHOICES.map((option) => (
-                <option key={option.value} value={String(option.value)}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              Filters {activeCount > 0 ? `(${activeCount})` : ""}
+            </button>
 
-          <div className="col-span-2">
-            <span className={`${LABEL} mb-1`}>Score range</span>
-            <div className="flex items-center gap-2">
-              <input
-                type="number"
-                min={0}
-                max={100}
-                inputMode="numeric"
-                placeholder="0"
-                aria-label="Lowest interest score"
-                value={filters.min_interest ?? ""}
-                onChange={(event) =>
-                  onPatch({
-                    min_interest: event.target.value ? Number(event.target.value) : undefined,
-                  })
-                }
-                className={FIELD}
-              />
-              <span className="text-xs text-gray-400">to</span>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                inputMode="numeric"
-                placeholder="100"
-                aria-label="Highest interest score"
-                value={filters.max_interest ?? ""}
-                onChange={(event) =>
-                  onPatch({
-                    max_interest: event.target.value ? Number(event.target.value) : undefined,
-                  })
-                }
-                className={FIELD}
-              />
-            </div>
+            <button
+              type="button"
+              onClick={onClear}
+              disabled={activeCount === 0 && searchInput.trim() === ""}
+              className="h-9 shrink-0 rounded-lg border border-gray-300 px-4 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.03]"
+            >
+              Reset
+            </button>
           </div>
         </div>
-      </Section>
+      </div>
+
+      {/* Bottom row: Filter Pills & Selects */}
+      {showAdvanced && (
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4 pt-2">
+        <div className="flex items-center gap-2">
+          <span className={`${LABEL} mb-0`}>Interest</span>
+          <PillRow>
+            {bands.map((band) => (
+              <Pill
+                key={band.value}
+                label={band.label}
+                hint={band.hint}
+                dot={dotFor(band.value)}
+                active={filters.band === band.value}
+                onClick={() => toggle("band", band.value)}
+              />
+            ))}
+          </PillRow>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className={`${LABEL} mb-0`}>Stage</span>
+          <PillRow>
+            {stages.map((name) => (
+              <Pill
+                key={name}
+                label={name}
+                dot={stageDot(name)}
+                active={filters.stage === name}
+                onClick={() => toggle("stage", name)}
+              />
+            ))}
+          </PillRow>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className={`${LABEL} mb-0`}>Show</span>
+          <PillRow>
+            <Pill
+              label="Waiting on you"
+              hint="They wrote last and nobody has answered"
+              active={Boolean(filters.awaiting)}
+              onClick={() => toggleFlag("awaiting")}
+            />
+            <Pill
+              label="Replied"
+              hint="Only chats where a real person wrote back"
+              active={Boolean(filters.replied)}
+              onClick={() => toggleFlag("replied")}
+            />
+            <Pill
+              label="Has a date"
+              hint="A site visit or follow-up is on the calendar"
+              active={Boolean(filters.scheduled)}
+              onClick={() => toggleFlag("scheduled")}
+            />
+            <Pill
+              label="Opted out"
+              hint="Customers who asked us to stop"
+              active={filters.paused === true}
+              onClick={() => onPatch({ paused: filters.paused === true ? undefined : true })}
+            />
+          </PillRow>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className={`${LABEL} mb-0`}>Engagement</span>
+          <select
+            value={filters.tier || ""}
+            onChange={(event) => onPatch({ tier: event.target.value || undefined })}
+            className={`${SELECT} w-auto`}
+          >
+            <option value="">Any</option>
+            {tiers.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className={`${LABEL} mb-0`} title="WhatsApp limits">
+            Can text
+          </span>
+          <select
+            value={filters.window || ""}
+            onChange={(event) => onPatch({ window: event.target.value || undefined })}
+            className={`${SELECT} w-auto`}
+          >
+            <option value="">Any</option>
+            {windows.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className={`${LABEL} mb-0`}>Gone quiet</span>
+          <select
+            value={filters.quiet_days ? String(filters.quiet_days) : ""}
+            onChange={(event) =>
+              onPatch({
+                quiet_days: event.target.value ? Number(event.target.value) : undefined,
+              })
+            }
+            className={`${SELECT} w-auto`}
+          >
+            <option value="">Any</option>
+            {QUIET_CHOICES.map((option) => (
+              <option key={option.value} value={String(option.value)}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className={`${LABEL} mb-0`}>Score</span>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              placeholder="0"
+              value={filters.min_interest ?? ""}
+              onChange={(event) =>
+                onPatch({
+                  min_interest: event.target.value ? Number(event.target.value) : undefined,
+                })
+              }
+              className={`${FIELD} w-16 px-2 text-center`}
+            />
+            <span className="text-xs text-gray-400">-</span>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              placeholder="100"
+              value={filters.max_interest ?? ""}
+              onChange={(event) =>
+                onPatch({
+                  max_interest: event.target.value ? Number(event.target.value) : undefined,
+                })
+              }
+              className={`${FIELD} w-16 px-2 text-center`}
+            />
+          </div>
+        </div>
+        </div>
+      )}
     </div>
   );
 }
