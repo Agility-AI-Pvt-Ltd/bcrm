@@ -55,10 +55,65 @@ export type PageResult<T> = {
   page_size: number;
 };
 
+/** The dashboard tiles, each of which drills into the rows it counted. */
+export type PropertyView =
+  | "all"
+  | "active"
+  | "new-this-month"
+  | "reserved"
+  | "sold";
+
+export const PROPERTY_VIEW_LABELS: Record<PropertyView, string> = {
+  all: "All properties",
+  active: "Active listings",
+  "new-this-month": "New this month",
+  reserved: "Reserved",
+  sold: "Sold this quarter",
+};
+
+/** Which stat on the Properties page each view corresponds to. */
+export const PROPERTY_VIEW_STAT: Record<
+  Exclude<PropertyView, "all">,
+  keyof PropertyStats
+> = {
+  active: "active_listings",
+  "new-this-month": "new_this_month",
+  reserved: "reserved",
+  sold: "sold_this_quarter",
+};
+
+export function isPropertyView(value: string | null): value is PropertyView {
+  return (
+    value === "all" ||
+    value === "active" ||
+    value === "new-this-month" ||
+    value === "reserved" ||
+    value === "sold"
+  );
+}
+
 export async function listProperties(page = 1, pageSize = 50) {
   return apiFetch<PageResult<PropertyRecord>>(
     `/api/v1/properties?page=${page}&page_size=${pageSize}`,
   );
+}
+
+/**
+ * Rows behind one dashboard tile. The server derives the filter from the same
+ * predicate that produced the tile's number, so the total here always matches
+ * the card the user clicked.
+ */
+export async function listPropertiesByView(
+  view: PropertyView,
+  page = 1,
+  pageSize = 25,
+) {
+  const params = new URLSearchParams({
+    view,
+    page: String(page),
+    page_size: String(pageSize),
+  });
+  return apiFetch<PageResult<PropertyRecord>>(`/api/v1/properties?${params}`);
 }
 
 export async function getPropertyStats() {

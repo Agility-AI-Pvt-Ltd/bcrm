@@ -133,14 +133,30 @@ export type Plan = {
   popular: boolean;
 };
 
-export type ActivatePlanResult = {
+export type PaymentMethod = "upi" | "bank_transfer" | "cash" | "cheque" | "other";
+
+export type Subscription = {
+  plan_code: string;
+  status: string;
+  starts_at: string;
+  ends_at: string;
+  requested_at?: string | null;
+  reviewed_at?: string | null;
+  review_note?: string | null;
+  payment_reference?: string | null;
+  payment_method?: string | null;
+};
+
+export type PlanRequestBody = {
+  plan_code: Plan["code"];
+  payment_reference: string;
+  payment_method: PaymentMethod;
+  payment_note?: string | null;
+};
+
+export type PlanRequestResult = {
   user: AuthUser;
-  subscription: {
-    plan_code: string;
-    status: string;
-    starts_at: string;
-    ends_at: string;
-  };
+  subscription: Subscription;
   message: string;
 };
 
@@ -392,13 +408,25 @@ export async function listPlans() {
   return apiFetch<Plan[]>("/api/v1/plans");
 }
 
-export async function activatePlan(plan_code: Plan["code"]) {
-  const result = await apiFetch<ActivatePlanResult>("/api/v1/plans/activate", {
+/**
+ * Ask for a plan. This does NOT enable the account.
+ *
+ * It replaced `activatePlan`, which did — there is no payment gateway, so that
+ * endpoint enabled anyone who could reach `/plans`. The request now waits for a
+ * platform operator to confirm the payment, so the caller must show a waiting
+ * state rather than sending the user into the app.
+ */
+export async function requestPlan(body: PlanRequestBody) {
+  const result = await apiFetch<PlanRequestResult>("/api/v1/plans/request", {
     method: "POST",
-    body: JSON.stringify({ plan_code }),
+    body: JSON.stringify(body),
   });
   cacheStoredUser(result.user);
   return result;
+}
+
+export async function fetchSubscription() {
+  return apiFetch<Subscription | null>("/api/v1/profile/subscription");
 }
 
 export { ApiError };

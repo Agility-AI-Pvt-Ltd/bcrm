@@ -414,19 +414,35 @@ export async function markCallbackCalled(contactId: string) {
 // The AI's office shift
 // ---------------------------------------------------------------------------
 
-export async function getOfficeSnapshot() {
-  return apiFetch<OfficeSnapshot>("/api/v1/outreach/office/snapshot");
+/**
+ * The two shifts.
+ *
+ * "campaign" is getting a campaign's messages out — retries and first touches.
+ * "followup" is what happens to a lead afterwards — re-engaging quiet leads,
+ * re-grading tiers, handing cold ones to a human. They run on separate
+ * schedules and live on separate pages, because a lead needs following up long
+ * after the campaign that first messaged it has finished.
+ */
+export type ShiftKind = "campaign" | "followup";
+
+const SHIFT_BASE: Record<ShiftKind, string> = {
+  campaign: "/api/v1/outreach/office",
+  followup: "/api/v1/followups",
+};
+
+export async function getOfficeSnapshot(kind: ShiftKind = "campaign") {
+  return apiFetch<OfficeSnapshot>(`${SHIFT_BASE[kind]}/snapshot`);
 }
 
-export async function runOfficeShift(plan?: string[]) {
-  return apiFetch<OfficeShiftResult>("/api/v1/outreach/office/run", {
+export async function runOfficeShift(plan?: string[], kind: ShiftKind = "campaign") {
+  return apiFetch<OfficeShiftResult>(`${SHIFT_BASE[kind]}/run`, {
     method: "POST",
     body: JSON.stringify({ plan: plan ?? null }),
   });
 }
 
-export async function scheduleOfficeShift() {
-  return apiFetch<OfficeScheduleResult>("/api/v1/outreach/office/schedule", {
+export async function scheduleOfficeShift(kind: ShiftKind = "campaign") {
+  return apiFetch<OfficeScheduleResult>(`${SHIFT_BASE[kind]}/schedule`, {
     method: "POST",
   });
 }

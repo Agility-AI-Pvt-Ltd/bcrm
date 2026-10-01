@@ -14,9 +14,12 @@
  * LLM reading a thread, or by the 6-hourly repair sweep. `reply_count` cannot. So
  * "did a human answer us" stays honest even when stages drift.
  *
- * This is the separate view for leads. /contacts remains the full book of
- * business and /pipeline remains the stage-and-tier board; nobody is removed from
- * either by appearing here.
+ * The stage-and-tier board that used to live at /pipeline is folded in here as
+ * the "Everyone" scope. The two pages were near-identical except for one line —
+ * pipeline asked for every contact, this one asks for `replied: true` — so they
+ * were one page with a filter, maintained as two. Keeping both scopes matters:
+ * dropping the unreplied rows would have hidden exactly the people the follow-up
+ * shift is working on. /contacts remains the full book of business.
  *
  * One thing on this page is not a filter but a work queue: when the AI offers a
  * callback and the customer says yes, the backend writes a `callback_requests`
@@ -51,13 +54,28 @@ const PAGE_SIZE = 25;
 /** Typing in the search box should not fire a request per keystroke. */
 const SEARCH_DEBOUNCE_MS = 350;
 
-const TIER_HINTS: Record<string, string> = {
-  high: "Replied more than once, or already deep in the funnel — call first",
-  medium: "Replied once — keep the conversation warm",
-  low: "Graded low despite replying — usually an opt-out",
+/** Who the list is showing. "replied" is the broker's definition of a lead. */
+type LeadScope = "replied" | "all";
+
+// The same tier means something different depending on the scope: among people
+// who wrote back, `low` is close to an opt-out; across everyone, `low` is simply
+// everyone still silent. Showing one wording in both places made the board lie.
+const TIER_HINTS: Record<LeadScope, Record<string, string>> = {
+  replied: {
+    high: "Replied more than once, or already deep in the funnel — call first",
+    medium: "Replied once — keep the conversation warm",
+    low: "Graded low despite replying — usually an opt-out",
+  },
+  all: {
+    high: "Replied more than once — call these first",
+    medium: "Replied once — keep the conversation going",
+    low: "No reply yet — the AI keeps following up",
+  },
 };
 
 const STAGE_HINTS: Record<string, string> = {
+  New: "In the list, not messaged yet",
+  Contacted: "First message sent, no reply yet",
   Replied: "Wrote back, nothing booked yet",
   "Visit Scheduled": "Agreed to see the property",
   Negotiating: "Talking price or terms",
@@ -67,6 +85,7 @@ const STAGE_HINTS: Record<string, string> = {
 export default function LeadsPage() {
   const [snapshot, setSnapshot] = useState<PipelineSnapshot | null>(null);
   const [page, setPage] = useState<LeadPageData | null>(null);
+  const [scope, setScope] = useState<LeadScope>("replied");
   const [stage, setStage] = useState("");
   const [tier, setTier] = useState("");
   const [awaitingOnly, setAwaitingOnly] = useState(false);
@@ -107,7 +126,8 @@ export default function LeadsPage() {
     try {
       setPage(
         await listLeads({
-          replied: true,
+          // The entire difference between this page and the old /pipeline.
+          replied: scope === "replied" || undefined,
           stage: stage || undefined,
           tier: tier || undefined,
           awaitingCallback: awaitingOnly || undefined,
@@ -121,7 +141,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [stage, tier, awaitingOnly, search, offset]);
+  }, [scope, stage, tier, awaitingOnly, search, offset]);
 
   useEffect(() => {
     void loadSnapshot();
@@ -171,13 +191,36 @@ export default function LeadsPage() {
   const tiers = snapshot?.tiers?.length ? snapshot.tiers : [...ENGAGEMENT_TIERS];
   const waiting = counts.callback_waiting ?? 0;
 
-  // Someone who replies is advanced to at least `Replied`, so the earlier stages
-  // would only ever render an empty filter. Sliced from the shared vocabulary
-  // rather than hardcoded, so a new stage appears here automatically.
+  // Someone who replies is advanced to at least `Replied`, so in the replied
+  // scope the earlier stages would only ever render an empty filter. Across
+  // everyone they are the most interesting ones — that is where the unworked
+  // backlog sits. Sliced from the shared vocabulary rather than hardcoded, so a
+  // new stage appears here automatically.
   const leadStages = useMemo(() => {
     const all = snapshot?.stages?.length ? snapshot.stages : [...CUSTOMER_STAGES];
+    if (scope === "all") return all;
     return all.slice(Math.max(0, all.indexOf("Replied")));
-  }, [snapshot]);
+  }, [snapshot, scope]);
+
+  const tierHints = TIER_HINTS[scope];
+
+  /**
+   * Switching scope narrows or widens who is listed, so a stage filter that only
+   * exists in the wider scope has to go — leaving `stage="New"` set while
+   * switching to replied-only would show an empty list with no visible reason.
+   */
+  const changeScope = useCallback(
+    (next: LeadScope) => {
+      setScope(next);
+      setOffset(0);
+      if (next === "replied") {
+        setStage((current) =>
+          current === "New" || current === "Contacted" ? "" : current,
+        );
+      }
+    },
+    [],
+  );
 
   const stats = useMemo(() => {
     const values = snapshot?.counts ?? {};
@@ -228,20 +271,50 @@ export default function LeadsPage() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white/90">
-            Everyone who wrote back
+            {scope === "replied" ? "Everyone who wrote back" : "The whole pipeline"}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
-            A real person replying on WhatsApp — even once — makes them a lead, and
-            they are listed here separately from the rest of your contacts.
+            {scope === "replied"
+              ? "A real person replying on WhatsApp — even once — makes them a lead, and they are listed here separately from the rest of your contacts."
+              : "Every contact across the six stages, including those who have not replied yet. The AI keeps following these up."}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={reload}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.03]"
-        >
-          Refresh
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* The old /pipeline board, folded in as a scope rather than a page. */}
+          <div
+            role="group"
+            aria-label="Who to show"
+            className="flex rounded-lg border border-gray-300 p-0.5 dark:border-gray-700"
+          >
+            {(
+              [
+                ["replied", "Replied only"],
+                ["all", "Everyone"],
+              ] as Array<[LeadScope, string]>
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => changeScope(value)}
+                aria-pressed={scope === value}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  scope === value
+                    ? "bg-brand-500 text-white"
+                    : "text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={reload}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.03]"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
@@ -312,7 +385,7 @@ export default function LeadsPage() {
                 </span>
               </div>
               <p className="mt-1.5 text-[11px] leading-snug text-gray-500">
-                {TIER_HINTS[name] || ""}
+                {tierHints[name] || ""}
               </p>
             </button>
           );
@@ -323,7 +396,7 @@ export default function LeadsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-semibold text-gray-900 dark:text-white/90">
-              Replied leads
+              {scope === "replied" ? "Replied leads" : "All contacts"}
             </h2>
             {stage ? (
               <Badge color={stageBadgeColor(stage)} size="sm">
@@ -398,6 +471,7 @@ export default function LeadsPage() {
                 <th className="px-5 py-3 font-medium">Stage</th>
                 <th className="px-5 py-3 font-medium">Engagement</th>
                 <th className="px-5 py-3 font-medium">Looking for</th>
+                <th className="px-5 py-3 font-medium">Messaged</th>
                 <th className="px-5 py-3 font-medium">Replies</th>
                 <th className="px-5 py-3 font-medium">Last reply</th>
                 <th className="px-5 py-3 font-medium">Callback</th>
@@ -406,13 +480,13 @@ export default function LeadsPage() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan={9} className="px-5 py-10 text-center text-gray-500">
                     Loading leads…
                   </td>
                 </tr>
               ) : !page || page.items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan={9} className="px-5 py-10 text-center text-gray-500">
                     {awaitingOnly
                       ? "Nobody is waiting for a call right now."
                       : filtered
@@ -563,6 +637,20 @@ function LeadRow({
         title={wants}
       >
         {wants || "—"}
+      </td>
+      {/* Kept from the old pipeline board. In the "Everyone" scope a contact
+          who has never replied has no reply text and no reply date, so this is
+          the only evidence on the row that we have reached out at all. */}
+      <td className="px-5 py-3 text-gray-500">
+        {lead.messaged_count}
+        {lead.first_messaged_at ? (
+          <span
+            className="ml-1 text-xs text-gray-400"
+            title={formatWhen(lead.first_messaged_at)}
+          >
+            (first {formatSince(lead.first_messaged_at)})
+          </span>
+        ) : null}
       </td>
       <td className="px-5 py-3 text-gray-500">{lead.reply_count}</td>
       <td className="px-5 py-3 text-gray-500" title={formatWhen(lead.last_reply_at)}>

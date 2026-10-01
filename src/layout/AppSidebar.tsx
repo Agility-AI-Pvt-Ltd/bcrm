@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
   BellIcon,
+  BoxCubeIcon,
   CalenderIcon,
   ChatIcon,
   ChevronDownIcon,
@@ -12,8 +13,11 @@ import {
   HomeIcon,
   HorizontaLDots,
   ShootingStarIcon,
+  TimeIcon,
   UserCircleIcon,
 } from "../icons/index";
+import { useStoredUser } from "@/hooks/useStoredUser";
+import { isAwaitingVerification } from "@/lib/access";
 
 type NavItem = {
   name: string;
@@ -40,16 +44,23 @@ const navItems: NavItem[] = [
     name: "Messages",
     path: "/messages",
   },
+  // Inventory, not a campaign step. Properties is looked at constantly — while
+  // answering a customer, while building a campaign, while checking a price —
+  // so it sits with the other daily-reference pages rather than one click down
+  // inside a group about setting campaigns up.
+  {
+    icon: <BoxCubeIcon />,
+    name: "Properties",
+    path: "/properties",
+  },
   {
     icon: <ShootingStarIcon />,
     name: "Campaign Studio",
     subItems: [
       { name: "WhatsApp Outreach", path: "/outreach", pro: false, new: true },
       { name: "AI Calling", path: "/calls", pro: false, new: true },
-      { name: "Lead Pipeline", path: "/pipeline", pro: false, new: true },
       { name: "Campaigns", path: "/campaigns", pro: false },
       { name: "Contacts", path: "/contacts", pro: false },
-      { name: "Properties", path: "/properties", pro: false },
     ],
   },
   // Deliberately top-level, not inside Campaign Studio: notifications span every
@@ -65,6 +76,15 @@ const navItems: NavItem[] = [
     name: "Calendar",
     path: "/calendar",
   },
+  // Not a campaign step either: a lead can go quiet weeks after the campaign
+  // that first messaged it finished, and still needs following up. It runs on
+  // its own schedule, so it gets its own entry rather than living under
+  // Campaign Studio.
+  {
+    icon: <TimeIcon />,
+    name: "Follow-ups",
+    path: "/follow-ups",
+  },
   {
     icon: <UserCircleIcon />,
     name: "User Profile",
@@ -75,6 +95,7 @@ const navItems: NavItem[] = [
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const awaitingVerification = isAwaitingVerification(useStoredUser());
 
   // Which group the current URL lives in. Derived during render instead of
   // pushed into state from an effect, so navigating costs one render, not two.
@@ -99,7 +120,14 @@ const AppSidebar: React.FC = () => {
   const [subMenuHeight, setSubMenuHeight] = useState<Record<number, number>>({});
   const subMenuRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
-  const isActive = useCallback((path: string) => path === pathname, [pathname]);
+  // Exact match, or a child route of it. Properties now has `/properties/list`
+  // behind its stat tiles, and an exact-only match left the menu unhighlighted
+  // there — the user is plainly still in Properties. The trailing slash matters:
+  // without it `/lead` would also light up on `/leads`.
+  const isActive = useCallback(
+    (path: string) => pathname === path || pathname.startsWith(`${path}/`),
+    [pathname],
+  );
 
   const handleSubmenuToggle = (index: number) => {
     setOverride({ pathname, index: openIndex === index ? null : index });
@@ -305,7 +333,20 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots />
                 )}
               </h2>
-              {renderMenuItems(navItems)}
+              {awaitingVerification ? (
+                /* Nothing in this menu is reachable until an operator verifies
+                   the account, and `AuthGate` turns every one of these links
+                   into a bounce back to /plans. Rendering them anyway would be
+                   the app advertising doors that do not open. */
+                isExpanded || isHovered || isMobileOpen ? (
+                  <p className="rounded-lg bg-gray-50 px-3 py-4 text-xs leading-relaxed text-gray-500 dark:bg-white/[0.04] dark:text-gray-400">
+                    Your account is awaiting verification. The workspace unlocks
+                    as soon as your payment is confirmed.
+                  </p>
+                ) : null
+              ) : (
+                renderMenuItems(navItems)
+              )}
             </div>
           </div>
         </nav>
