@@ -7,6 +7,7 @@ import { DropdownItem } from "../ui/dropdown/DropdownItem";
 import { logoutAccount } from "@/lib/auth";
 import { useStoredUser } from "@/hooks/useStoredUser";
 import { profileAvatarName, resolveProfileAvatar } from "@/lib/avatars";
+import { isAllowedWhenDisabled, isAwaitingVerification } from "@/lib/access";
 
 const MENU_ITEMS = [
   { href: "/profile", label: "Edit profile" },
@@ -23,6 +24,11 @@ export default function UserDropdown() {
   // Subscribed, not read once on mount: saving a new avatar on /profile has to
   // change this header immediately, without a reload.
   const user = useStoredUser();
+  // An unverified account can only open two of these. Showing the rest would be
+  // offering a door that bounces them straight back to /plans.
+  const menuItems = isAwaitingVerification(user)
+    ? MENU_ITEMS.filter((item) => isAllowedWhenDisabled(item.href))
+    : MENU_ITEMS;
 
   function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
     e.stopPropagation();
@@ -100,7 +106,7 @@ export default function UserDropdown() {
         </div>
 
         <ul className="flex flex-col gap-1 border-b border-gray-200 pt-4 pb-3 dark:border-gray-800">
-          {MENU_ITEMS.map((item) => (
+          {menuItems.map((item) => (
             <li key={item.href}>
               <DropdownItem
                 onItemClick={() => goTo(item.href)}

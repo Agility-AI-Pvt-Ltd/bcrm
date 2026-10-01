@@ -16,6 +16,8 @@ import {
   TimeIcon,
   UserCircleIcon,
 } from "../icons/index";
+import { useStoredUser } from "@/hooks/useStoredUser";
+import { isAwaitingVerification } from "@/lib/access";
 
 type NavItem = {
   name: string;
@@ -93,6 +95,7 @@ const navItems: NavItem[] = [
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+  const awaitingVerification = isAwaitingVerification(useStoredUser());
 
   // Which group the current URL lives in. Derived during render instead of
   // pushed into state from an effect, so navigating costs one render, not two.
@@ -330,7 +333,20 @@ const AppSidebar: React.FC = () => {
                   <HorizontaLDots />
                 )}
               </h2>
-              {renderMenuItems(navItems)}
+              {awaitingVerification ? (
+                /* Nothing in this menu is reachable until an operator verifies
+                   the account, and `AuthGate` turns every one of these links
+                   into a bounce back to /plans. Rendering them anyway would be
+                   the app advertising doors that do not open. */
+                isExpanded || isHovered || isMobileOpen ? (
+                  <p className="rounded-lg bg-gray-50 px-3 py-4 text-xs leading-relaxed text-gray-500 dark:bg-white/[0.04] dark:text-gray-400">
+                    Your account is awaiting verification. The workspace unlocks
+                    as soon as your payment is confirmed.
+                  </p>
+                ) : null
+              ) : (
+                renderMenuItems(navItems)
+              )}
             </div>
           </div>
         </nav>

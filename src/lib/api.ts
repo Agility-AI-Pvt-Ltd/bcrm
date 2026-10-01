@@ -67,6 +67,14 @@ function readOrgId(): string {
   }
 }
 
+function redirectToPlans(): void {
+  if (typeof window === "undefined") return;
+  const { pathname } = window.location;
+  // Already there, or on the one other page a disabled account may use.
+  if (pathname === "/plans" || pathname.startsWith("/profile")) return;
+  window.location.replace("/plans");
+}
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
@@ -102,10 +110,18 @@ export async function apiFetch<T>(
   }
 
   if (!response.ok || payload?.success === false) {
+    const code = payload?.error?.code;
+    if (response.status === 403 && code === "account_disabled") {
+      // The API now refuses every org-scoped route to a disabled account, so a
+      // plan that lapses mid-session turns the next few requests into errors all
+      // at once. AuthGate only checks on navigation; without this the user sits
+      // on a half-broken page collecting toasts instead of being told what to do.
+      redirectToPlans();
+    }
     throw new ApiError(
       payload?.error?.message || `Request failed (${response.status})`,
       response.status,
-      payload?.error?.code,
+      code,
       payload?.error?.details,
     );
   }
