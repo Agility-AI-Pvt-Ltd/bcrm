@@ -1,12 +1,10 @@
-import type { Metadata } from "next";
-import CallCampaignWorkspace from "@/components/calls/CallCampaignWorkspace";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "AI Calling | EstateFlow",
-  description:
-    "Call a whole group with an AI agent, decide how it should talk, and read a summary of every conversation.",
-};
-
+/**
+ * Manual AI calls and call campaigns are switched off: outbound AI voice is used
+ * only to call back WhatsApp enquiries, which is configured on its own page. The
+ * old workspace (components/calls) is kept for when CALLS_MANUAL_ENABLED returns.
+ */
 export default function Page() {
-  return <CallCampaignWorkspace />;
+  redirect("/profile/ai-callback");
 }
