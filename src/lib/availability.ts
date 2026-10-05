@@ -66,26 +66,29 @@ export const MODE_OPTIONS: {
   {
     value: "available",
     label: "Available",
-    description: "You're reachable now. The AI shares your number straight away.",
+    description:
+      "You're reachable now. The AI shares your number straight away and makes no AI calls.",
     dot: "bg-success-500",
   },
   {
     value: "scheduled",
     label: "Working hours",
-    description: "Follow the schedule below. The AI covers evenings and days off.",
+    description:
+      "Follow the schedule below. The AI covers evenings and days off, and can make AI calls.",
     dot: "bg-brand-500",
   },
   {
     value: "ai_only",
     label: "AI only",
     description:
-      "The AI handles every enquiry and never gives out your number. Always on.",
+      "The default. The AI handles every enquiry and makes AI calls at any time of day. Your number is shared only if a customer asks for a person, with your away message.",
     dot: "bg-purple-500",
   },
   {
     value: "away",
     label: "Away",
-    description: "You're not reachable at all today. The AI covers and takes messages.",
+    description:
+      "You're not reachable at all today. The AI covers, takes messages and can make AI calls.",
     dot: "bg-gray-400",
   },
 ];

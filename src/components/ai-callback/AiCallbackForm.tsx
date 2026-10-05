@@ -135,7 +135,7 @@ export default function AiCallbackForm() {
           {live
             ? `On. Quiet new enquiries are called ${settings.delay_minutes} minute${
                 settings.delay_minutes === 1 ? "" : "s"
-              } after the AI’s reply, during your working hours.`
+              } after the AI’s reply, at any time, unless your status is Available.`
             : settings.enabled
               ? "Switched on, but calls can’t be placed yet — see below."
               : "Off. Nobody is called; enquiries are handled on WhatsApp only."}
@@ -198,12 +198,14 @@ export default function AiCallbackForm() {
           ))}
         </ol>
         <p className="mt-3 text-xs text-gray-500">
-          Each enquiry is called at most once, and nobody is called twice within 7 days. Calls only
-          go out inside your{" "}
+          Calls go out from your Vobiz number, so no personal number is needed. The AI calls in
+          every{" "}
           <Link href="/profile/availability" className="text-brand-500 underline">
-            working hours
-          </Link>
-          , and never to customers who opted out or are being handled by a person.
+            status
+          </Link>{" "}
+          except Available — when you&rsquo;re Available, you handle new enquiries yourself. Each
+          enquiry is called at most once, nobody is called twice within 7 days, and customers who
+          opted out or are being handled by a person are never called.
         </p>
       </div>
     </section>

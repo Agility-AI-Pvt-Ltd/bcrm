@@ -31,6 +31,7 @@ import {
 } from "@/lib/inbox";
 import { formatSince, formatWhen, stageBadgeColor } from "@/lib/outreach";
 import { CalendarIcon, Dot, dotFor, MetaRule, SpanningLabel } from "@/components/messages/tokens";
+import { AiCallbackStrip } from "@/components/messages/AiCallbackStatus";
 
 const MAX_LENGTH = 4096;
 
@@ -170,6 +171,8 @@ export default function ChatPanel({
               </Badge>
             )}
           </div>
+
+          {thread.ai_callback && <AiCallbackStrip view={thread.ai_callback} />}
         </header>
 
         {/* --- transcript --------------------------------------------------- */}

@@ -290,7 +290,11 @@ export default function AvailabilityForm() {
               className={fieldClass}
             />
             <span className="mt-1.5 block text-xs text-gray-500">
-              {availability.human_phone
+              {availability.mode === "ai_only"
+                ? availability.human_phone
+                  ? "In AI only, given only when a customer asks to speak to a person."
+                  : "In AI only, given only when a customer asks for a person. Blank, so your profile number is used if there is one."
+                : availability.human_phone
                 ? "Given to customers when a chat is handed over."
                 : availability.effective_phone
                   ? `Blank, so your profile number ${availability.effective_phone} is used.`
@@ -312,8 +316,8 @@ export default function AvailabilityForm() {
               className={fieldClass}
             />
             <span className="mt-1.5 block text-xs text-gray-500">
-              Replaces the default &ldquo;away right now&rdquo; line when you&rsquo;re
-              unreachable.
+              Sent with your number when you&rsquo;re unreachable, and in AI only when a
+              customer asks to speak to a person.
             </span>
           </label>
 

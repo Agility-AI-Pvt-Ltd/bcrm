@@ -24,6 +24,7 @@ import {
 } from "@/lib/inbox";
 import { formatSince, formatWhen, stageBadgeColor } from "@/lib/outreach";
 import { CalendarIcon } from "@/components/messages/tokens";
+import { AiCallbackBadge } from "@/components/messages/AiCallbackStatus";
 
 type Props = {
   threads: InboxThread[];
@@ -188,6 +189,8 @@ function ThreadRow({
               {formatWhen(thread.scheduled_at)}
             </div>
           )}
+
+          {thread.ai_callback && <AiCallbackBadge view={thread.ai_callback} />}
 
           {thread.outreach_paused && (
             <Badge color="error" size="sm">
