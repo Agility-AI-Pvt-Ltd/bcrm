@@ -30,6 +30,7 @@ import MessageFilters from "@/components/messages/MessageFilters";
 import ThreadList from "@/components/messages/ThreadList";
 import { FIELD, LABEL } from "@/components/messages/tokens";
 import { ApiError } from "@/lib/api";
+import { listConversationAiCalls, type AiCallDetail } from "@/lib/aiCallback";
 import {
   activeFilterCount,
   createGroup,
@@ -82,6 +83,8 @@ export default function MessagesWorkspace() {
   const [detail, setDetail] = useState<InboxThreadDetail | null>(null);
   const [showDetails, setShowDetails] = useState(true);
   const [messages, setMessages] = useState<InboxMessage[]>([]);
+  // AI calls made for the open chat, shown as cards in its timeline.
+  const [aiCalls, setAiCalls] = useState<AiCallDetail[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [loadingThread, setLoadingThread] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
@@ -147,11 +150,14 @@ export default function MessagesWorkspace() {
       setActiveId(conversationId);
       setLoadingThread(true);
       try {
-        const [threadDetail, messagePage] = await Promise.all([
+        const [threadDetail, messagePage, calls] = await Promise.all([
           getThread(conversationId),
           listMessages(conversationId, { limit: MESSAGE_PAGE_SIZE }),
+          // A chat must still open if the call list cannot be read.
+          listConversationAiCalls(conversationId).catch(() => [] as AiCallDetail[]),
         ]);
         setDetail(threadDetail);
+        setAiCalls(calls);
         setMessages(messagePage.items);
         setHasMore(messagePage.has_more);
       } catch (error) {
@@ -175,9 +181,12 @@ export default function MessagesWorkspace() {
     const live = (phase?: string | null) => !!phase && AI_CALLBACK_LIVE_PHASES.has(phase);
     return (
       (page?.items ?? []).some((thread) => live(thread.ai_callback?.phase)) ||
-      live(detail?.thread.ai_callback?.phase)
+      live(detail?.thread.ai_callback?.phase) ||
+      // The transcript is saved a few seconds after hang-up; keep reading until
+      // the call card has it.
+      aiCalls.some((call) => !!call.answered_at && call.transcript.length === 0)
     );
-  }, [page, detail]);
+  }, [page, detail, aiCalls]);
 
   useEffect(() => {
     if (!callbackLive) return;
@@ -186,10 +195,14 @@ export default function MessagesWorkspace() {
         try {
           setPage(await listThreads({ filters, sort, limit: PAGE_SIZE, offset }));
           if (activeId) {
-            const fresh = await getThread(activeId);
+            const [fresh, calls] = await Promise.all([
+              getThread(activeId),
+              listConversationAiCalls(activeId).catch(() => null),
+            ]);
             setDetail((current) =>
               current && current.thread.conversation_id === activeId ? fresh : current,
             );
+            if (calls) setAiCalls(calls);
           }
         } catch {
           // The next tick tries again; a failed background read is not worth a toast.
@@ -513,6 +526,7 @@ export default function MessagesWorkspace() {
           <ChatPanel
             detail={detail}
             messages={messages}
+            aiCalls={aiCalls}
             hasMore={hasMore}
             loading={loadingThread}
             loadingOlder={loadingOlder}

@@ -31,13 +31,17 @@ import {
 } from "@/lib/inbox";
 import { formatSince, formatWhen, stageBadgeColor } from "@/lib/outreach";
 import { CalendarIcon, Dot, dotFor, MetaRule, SpanningLabel } from "@/components/messages/tokens";
-import { AiCallbackStrip } from "@/components/messages/AiCallbackStatus";
+import { AiCallbackBadge, AiCallbackStrip } from "@/components/messages/AiCallbackStatus";
+import AiCallDetails from "@/components/ai-callback/AiCallDetails";
+import type { AiCallDetail } from "@/lib/aiCallback";
 
 const MAX_LENGTH = 4096;
 
 type Props = {
   detail: InboxThreadDetail | null;
   messages: InboxMessage[];
+  /** AI calls made for this chat; shown in the timeline where they happened. */
+  aiCalls?: AiCallDetail[];
   hasMore: boolean;
   loading: boolean;
   loadingOlder: boolean;
@@ -52,6 +56,7 @@ type Props = {
 export default function ChatPanel({
   detail,
   messages,
+  aiCalls = [],
   hasMore,
   loading,
   loadingOlder,
@@ -73,7 +78,10 @@ export default function ChatPanel({
     node.scrollTop = node.scrollHeight;
   }, [conversationId, messages.length, loadingOlder]);
 
-  const groups = useMemo(() => groupByDay(messages), [messages]);
+  const groups = useMemo(
+    () => groupByDay(timeline(messages, aiCalls, hasMore)),
+    [messages, aiCalls, hasMore],
+  );
 
   if (!detail) {
     return (
@@ -200,9 +208,13 @@ export default function ChatPanel({
             groups.map((group) => (
               <div key={group.day} className="space-y-4">
                 <SpanningLabel>{group.day}</SpanningLabel>
-                {group.items.map((message) => (
-                  <Bubble key={message.id} message={message} />
-                ))}
+                {group.items.map((item) =>
+                  item.kind === "call" ? (
+                    <CallCard key={`call-${item.call.id}`} call={item.call} />
+                  ) : (
+                    <Bubble key={item.message.id} message={item.message} />
+                  ),
+                )}
               </div>
             ))
           )}
@@ -344,15 +356,57 @@ function Bubble({ message }: { message: InboxMessage }) {
 }
 
 /** Day separators, so a long thread reads like a conversation and not a log. */
-function groupByDay(messages: InboxMessage[]) {
-  const groups: { day: string; items: InboxMessage[] }[] = [];
-  for (const message of messages) {
-    const day = dayLabel(message.created_at);
+type TimelineItem =
+  | { kind: "message"; at: string | null; message: InboxMessage }
+  | { kind: "call"; at: string | null; call: AiCallDetail };
+
+/**
+ * Messages and AI calls in one time order. While older messages are still
+ * unloaded, calls from before the oldest loaded message are held back, so a call
+ * never appears above messages that have not been fetched yet.
+ */
+function timeline(
+  messages: InboxMessage[],
+  calls: AiCallDetail[],
+  hasMore: boolean,
+): TimelineItem[] {
+  const oldest = messages[0]?.created_at ?? null;
+  const items: TimelineItem[] = messages.map((message) => ({
+    kind: "message",
+    at: message.created_at,
+    message,
+  }));
+  for (const call of calls) {
+    if (hasMore && oldest && call.created_at && call.created_at < oldest) continue;
+    items.push({ kind: "call", at: call.created_at, call });
+  }
+  return items.sort((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+}
+
+function groupByDay(items: TimelineItem[]) {
+  const groups: { day: string; items: TimelineItem[] }[] = [];
+  for (const item of items) {
+    const day = dayLabel(item.at);
     const last = groups[groups.length - 1];
-    if (last && last.day === day) last.items.push(message);
-    else groups.push({ day, items: [message] });
+    if (last && last.day === day) last.items.push(item);
+    else groups.push({ day, items: [item] });
   }
   return groups;
+}
+
+/** An AI call, in the chat where it belongs: status, what was learned, transcript. */
+function CallCard({ call }: { call: AiCallDetail }) {
+  return (
+    <div className="mx-auto w-full max-w-xl rounded-xl border border-brand-200 bg-white p-4 shadow-xs dark:border-brand-500/30 dark:bg-gray-900">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-gray-800 dark:text-white/90">
+          AI call{call.business_name ? ` from ${call.business_name}` : ""}
+        </p>
+        <AiCallbackBadge view={call.ai_callback} />
+      </div>
+      <AiCallDetails call={call} />
+    </div>
+  );
 }
 
 function dayLabel(value: string | null) {
