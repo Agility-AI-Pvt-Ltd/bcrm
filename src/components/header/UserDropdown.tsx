@@ -12,6 +12,7 @@ import { isAllowedWhenDisabled, isAwaitingVerification } from "@/lib/access";
 const MENU_ITEMS = [
   { href: "/profile", label: "Edit profile" },
   { href: "/profile/availability", label: "Availability" },
+  { href: "/profile/ai-callback", label: "AI callback" },
   { href: "/profile/work-locations", label: "Work locations" },
   { href: "/profile/api-management", label: "API management" },
   { href: "/profile/change-password", label: "Change password" },

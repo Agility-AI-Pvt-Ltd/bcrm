@@ -58,7 +58,8 @@ const navItems: NavItem[] = [
     name: "Campaign Studio",
     subItems: [
       { name: "WhatsApp Outreach", path: "/outreach", pro: false, new: true },
-      { name: "AI Calling", path: "/calls", pro: false, new: true },
+      // Manual AI calling is off; the AI only phones quiet WhatsApp enquiries,
+      // configured under the profile menu -> AI callback.
       { name: "Campaigns", path: "/campaigns", pro: false },
       { name: "Contacts", path: "/contacts", pro: false },
     ],

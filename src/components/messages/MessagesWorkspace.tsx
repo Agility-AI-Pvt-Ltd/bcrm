@@ -367,7 +367,7 @@ export default function MessagesWorkspace() {
           <p className="text-sm text-gray-700 dark:text-gray-200">
             <span className="font-medium">“{madeGroup.name}”</span> is ready with{" "}
             {madeGroup.rows} customer{madeGroup.rows === 1 ? "" : "s"}. Message them on
-            WhatsApp, or have the AI call them.
+            WhatsApp.
           </p>
           <div className="flex items-center gap-2">
             <a
@@ -375,12 +375,6 @@ export default function MessagesWorkspace() {
               className="rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600"
             >
               Message on WhatsApp
-            </a>
-            <a
-              href={`/calls?dataset=${encodeURIComponent(madeGroup.id)}`}
-              className="rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-500/10"
-            >
-              Call this group
             </a>
             <button
               type="button"
