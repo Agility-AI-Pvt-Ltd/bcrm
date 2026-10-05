@@ -12,6 +12,7 @@ import {
   GridIcon,
   HomeIcon,
   HorizontaLDots,
+  PhoneCallIcon,
   ShootingStarIcon,
   TimeIcon,
   UserCircleIcon,
@@ -58,8 +59,6 @@ const navItems: NavItem[] = [
     name: "Campaign Studio",
     subItems: [
       { name: "WhatsApp Outreach", path: "/outreach", pro: false, new: true },
-      // Manual AI calling is off; the AI only phones quiet WhatsApp enquiries,
-      // configured under the profile menu -> AI callback.
       { name: "Campaigns", path: "/campaigns", pro: false },
       { name: "Contacts", path: "/contacts", pro: false },
     ],
@@ -85,6 +84,14 @@ const navItems: NavItem[] = [
     icon: <TimeIcon />,
     name: "Follow-ups",
     path: "/follow-ups",
+  },
+  // The one outbound AI call left: phoning WhatsApp enquiries that went quiet.
+  // Top-level rather than inside Campaign Studio or the profile menu, because it
+  // runs continuously on every new enquiry, not as part of a campaign.
+  {
+    icon: <PhoneCallIcon />,
+    name: "AI Callback",
+    path: "/ai-callback",
   },
   {
     icon: <UserCircleIcon />,

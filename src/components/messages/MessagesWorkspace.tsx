@@ -40,6 +40,7 @@ import {
   listMessages,
   listThreads,
   sendManualMessage,
+  AI_CALLBACK_LIVE_PHASES,
   type FilterVocabulary,
   type InboxFilters,
   type InboxMessage,
@@ -51,6 +52,8 @@ import {
 const PAGE_SIZE = 25;
 const MESSAGE_PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 350;
+/** How often to re-read while an AI callback is counting down or on the line. */
+const AI_CALLBACK_POLL_MS = 10_000;
 
 /** The counts strip doubles as one-click filters, in the order a broker triages. */
 const COUNT_FILTERS: { key: string; patch: Partial<InboxFilters> | null }[] = [
@@ -163,6 +166,38 @@ export default function MessagesWorkspace() {
   useEffect(() => {
     if (conversationFromUrl) void openThread(conversationFromUrl);
   }, [conversationFromUrl, openThread]);
+
+  // While any AI callback on screen is counting down or on the line, re-read the
+  // list and the open chat's header so "AI call in 0:00" turns into "Ringing",
+  // then "done" or "failed", without the broker pressing Refresh. Quiet reads:
+  // no loading states, and the transcript is left alone.
+  const callbackLive = useMemo(() => {
+    const live = (phase?: string | null) => !!phase && AI_CALLBACK_LIVE_PHASES.has(phase);
+    return (
+      (page?.items ?? []).some((thread) => live(thread.ai_callback?.phase)) ||
+      live(detail?.thread.ai_callback?.phase)
+    );
+  }, [page, detail]);
+
+  useEffect(() => {
+    if (!callbackLive) return;
+    const timer = setInterval(() => {
+      void (async () => {
+        try {
+          setPage(await listThreads({ filters, sort, limit: PAGE_SIZE, offset }));
+          if (activeId) {
+            const fresh = await getThread(activeId);
+            setDetail((current) =>
+              current && current.thread.conversation_id === activeId ? fresh : current,
+            );
+          }
+        } catch {
+          // The next tick tries again; a failed background read is not worth a toast.
+        }
+      })();
+    }, AI_CALLBACK_POLL_MS);
+    return () => clearInterval(timer);
+  }, [callbackLive, filters, sort, offset, activeId]);
 
   /** Offset walks backwards from the latest message, so older pages prepend. */
   const loadOlder = useCallback(async () => {

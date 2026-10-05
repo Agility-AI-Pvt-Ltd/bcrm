@@ -110,6 +110,44 @@ export type ServiceWindow = {
   reason: string;
 };
 
+/**
+ * Where this chat's AI callback is. `seconds_left` is set only while the timer
+ * runs — count down from it rather than from `due_at`, so a wrong clock on this
+ * computer cannot make the countdown lie.
+ */
+export type AiCallbackPhase =
+  | "scheduled"
+  | "checking"
+  | "cancelled"
+  | "skipped"
+  | "dialing"
+  | "ringing"
+  | "on_call"
+  | "completed"
+  | "failed";
+
+export type AiCallbackView = {
+  phase: AiCallbackPhase | string;
+  tone: "info" | "success" | "error" | "neutral" | string;
+  label: string;
+  detail: string | null;
+  seconds_left: number | null;
+  due_at: string | null;
+  reason: string | null;
+  call_status: string | null;
+  outcome: string | null;
+  whatsapp_status: string | null;
+};
+
+/** Phases that will change on their own, so the screen should keep checking. */
+export const AI_CALLBACK_LIVE_PHASES = new Set([
+  "scheduled",
+  "checking",
+  "dialing",
+  "ringing",
+  "on_call",
+]);
+
 export type InboxThread = {
   conversation_id: string;
   contact_id: string | null;
@@ -144,6 +182,8 @@ export type InboxThread = {
   outreach_paused: boolean;
   source_dataset_id: string | null;
   updated_at: string | null;
+  /** Absent when this chat never had an AI callback. */
+  ai_callback?: AiCallbackView | null;
 };
 
 export type InboxCounts = {
