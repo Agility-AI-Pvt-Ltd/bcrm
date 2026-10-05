@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import AiCallbackActivityList from "@/components/ai-callback/AiCallbackActivityList";
 import AiCallbackForm from "@/components/ai-callback/AiCallbackForm";
+import AiTestCall from "@/components/ai-callback/AiTestCall";
 
 export const metadata: Metadata = {
   title: "AI Callback | EstateFlow",
@@ -11,6 +12,7 @@ export default function Page() {
   return (
     <>
       <AiCallbackForm />
+      <AiTestCall />
       <AiCallbackActivityList />
     </>
   );

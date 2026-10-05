@@ -10,9 +10,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { failureText } from "@/lib/api";
 import {
+  getAiCall,
   getAiCallbackActivity,
+  type AiCallDetail,
   type AiCallbackActivity,
 } from "@/lib/aiCallback";
+import AiCallDetails from "@/components/ai-callback/AiCallDetails";
 import { AI_CALLBACK_LIVE_PHASES } from "@/lib/inbox";
 import { formatSince, formatWhen } from "@/lib/outreach";
 import { AiCallbackBadge } from "@/components/messages/AiCallbackStatus";
@@ -40,6 +43,27 @@ export default function AiCallbackActivityList() {
   const [activity, setActivity] = useState<AiCallbackActivity | null>(null);
   const [error, setError] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  // The call whose transcript is open, and the details fetched for it.
+  const [openCallId, setOpenCallId] = useState<string | null>(null);
+  const [details, setDetails] = useState<Record<string, AiCallDetail>>({});
+
+  const loadDetail = useCallback(async (callId: string) => {
+    try {
+      const detail = await getAiCall(callId);
+      setDetails((current) => ({ ...current, [callId]: detail }));
+    } catch (err) {
+      setError(failureText(err, "Could not load that call."));
+    }
+  }, []);
+
+  const toggle = (callId: string) => {
+    if (openCallId === callId) {
+      setOpenCallId(null);
+      return;
+    }
+    setOpenCallId(callId);
+    void loadDetail(callId);
+  };
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -65,9 +89,12 @@ export default function AiCallbackActivityList() {
 
   useEffect(() => {
     if (!live) return;
-    const timer = setInterval(() => void load(), POLL_MS);
+    const timer = setInterval(() => {
+      void load();
+      if (openCallId) void loadDetail(openCallId);
+    }, POLL_MS);
     return () => clearInterval(timer);
-  }, [live, load]);
+  }, [live, load, loadDetail, openCallId]);
 
   const counts = activity?.counts ?? {};
 
@@ -142,13 +169,34 @@ export default function AiCallbackActivityList() {
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1.5">
                 <AiCallbackBadge view={item.ai_callback} />
-                <Link
-                  href={`/messages?conversation=${encodeURIComponent(item.conversation_id)}`}
-                  className="text-xs font-medium text-brand-500 hover:underline"
-                >
-                  Open chat
-                </Link>
+                <div className="flex items-center gap-3">
+                  {item.call_id ? (
+                    <button
+                      type="button"
+                      onClick={() => toggle(item.call_id as string)}
+                      aria-expanded={openCallId === item.call_id}
+                      className="text-xs font-medium text-brand-500 hover:underline"
+                    >
+                      {openCallId === item.call_id ? "Hide call" : "View call"}
+                    </button>
+                  ) : null}
+                  <Link
+                    href={`/messages?conversation=${encodeURIComponent(item.conversation_id)}`}
+                    className="text-xs font-medium text-brand-500 hover:underline"
+                  >
+                    Open chat
+                  </Link>
+                </div>
               </div>
+              {item.call_id && openCallId === item.call_id ? (
+                <div className="w-full rounded-lg bg-gray-50 p-3 dark:bg-white/[0.03]">
+                  {details[item.call_id] ? (
+                    <AiCallDetails call={details[item.call_id]} />
+                  ) : (
+                    <p className="text-xs text-gray-500">Loading call…</p>
+                  )}
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

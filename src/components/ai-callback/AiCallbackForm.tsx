@@ -152,6 +152,16 @@ export default function AiCallbackForm() {
         </ul>
       ) : null}
 
+      {settings.advisories?.length ? (
+        <ul className="mt-3 space-y-1">
+          {settings.advisories.map((note) => (
+            <li key={note} className="text-sm text-warning-600">
+              {note}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       {error ? <p className="mt-3 text-sm text-error-500">{error}</p> : null}
       {notice ? <p className="mt-3 text-sm text-success-600">{notice}</p> : null}
 
