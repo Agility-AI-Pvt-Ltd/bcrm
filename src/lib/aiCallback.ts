@@ -1,4 +1,5 @@
 import { apiFetch } from "./api";
+import type { AiCallbackView } from "./inbox";
 
 /**
  * The enquiry callback: when someone messages on WhatsApp, the AI replies, and
@@ -29,4 +30,24 @@ export async function updateAiCallback(payload: AiCallbackUpdate) {
     method: "PUT",
     body: JSON.stringify(payload),
   });
+}
+
+export type AiCallbackActivityItem = {
+  id: string;
+  conversation_id: string;
+  customer_name: string | null;
+  phone: string | null;
+  created_at: string | null;
+  ai_callback: AiCallbackView;
+};
+
+export type AiCallbackActivity = {
+  items: AiCallbackActivityItem[];
+  /** How many of `items` are in each phase. */
+  counts: Record<string, number>;
+};
+
+/** Upcoming and recent AI callbacks, newest first. */
+export async function getAiCallbackActivity(limit = 50) {
+  return apiFetch<AiCallbackActivity>(`/api/v1/profile/ai-callback/activity?limit=${limit}`);
 }

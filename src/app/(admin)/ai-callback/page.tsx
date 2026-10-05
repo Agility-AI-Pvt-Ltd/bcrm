@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import AiCallbackActivityList from "@/components/ai-callback/AiCallbackActivityList";
 import AiCallbackForm from "@/components/ai-callback/AiCallbackForm";
 
 export const metadata: Metadata = {
@@ -7,5 +8,10 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <AiCallbackForm />;
+  return (
+    <>
+      <AiCallbackForm />
+      <AiCallbackActivityList />
+    </>
+  );
 }
