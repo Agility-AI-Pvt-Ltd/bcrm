@@ -13,6 +13,7 @@ import {
   HomeIcon,
   HorizontaLDots,
   PhoneCallIcon,
+  PlugInIcon,
   ShootingStarIcon,
   TimeIcon,
   UserCircleIcon,
@@ -92,6 +93,13 @@ const navItems: NavItem[] = [
     icon: <PhoneCallIcon />,
     name: "AI Callback",
     path: "/ai-callback",
+  },
+  // Where leads come from. Zoho CRM is the lead source of truth: the portals
+  // feed Zoho, and EstateFlow keeps a synced copy.
+  {
+    icon: <PlugInIcon />,
+    name: "Integrations",
+    subItems: [{ name: "Zoho CRM", path: "/integrations/zoho", pro: false, new: true }],
   },
   {
     icon: <UserCircleIcon />,
