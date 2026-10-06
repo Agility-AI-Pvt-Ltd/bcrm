@@ -12,6 +12,7 @@ import {
   zohoPhase,
   type ZohoStatus,
 } from "@/lib/zoho";
+import LeadFirstTouchCard from "./LeadFirstTouchCard";
 import ZohoFieldMapping from "./ZohoFieldMapping";
 import ZohoLeadsTable from "./ZohoLeadsTable";
 
@@ -267,6 +268,7 @@ export default function ZohoIntegrationPage() {
 
       {status?.connected ? (
         <>
+          <LeadFirstTouchCard refreshKey={status.last_successful_sync_at ?? ""} />
           <ZohoFieldMapping refreshKey={status.last_successful_sync_at ?? ""} onSaved={() => void load()} />
           <ZohoLeadsTable refreshKey={`${status.leads_synced}:${status.last_successful_sync_at ?? ""}`} />
         </>
