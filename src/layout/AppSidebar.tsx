@@ -13,6 +13,7 @@ import {
   HomeIcon,
   HorizontaLDots,
   PhoneCallIcon,
+  PlugInIcon,
   ShootingStarIcon,
   TimeIcon,
   UserCircleIcon,
@@ -53,6 +54,13 @@ const navItems: NavItem[] = [
     icon: <BoxCubeIcon />,
     name: "Properties",
     path: "/properties",
+  },
+  // Where enquiries come from (99acres today). Top-level: leads arrive on their
+  // own, not as a campaign step.
+  {
+    icon: <PlugInIcon />,
+    name: "Lead Sources",
+    path: "/lead-sources",
   },
   {
     icon: <ShootingStarIcon />,

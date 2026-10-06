@@ -14,7 +14,8 @@ export type NotificationKind =
   | "call_answered"
   | "call_completed"
   | "visit_booked"
-  | "callback_requested";
+  | "callback_requested"
+  | "portal_lead";
 
 export type OrgNotification = {
   id: string;
