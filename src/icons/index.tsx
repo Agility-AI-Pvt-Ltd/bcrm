@@ -50,6 +50,7 @@ import DocsIcon from "./docs.svg";
 import MailIcon from "./mail-line.svg";
 import HorizontaLDots from "./horizontal-dots.svg";
 import ChatIcon from "./chat.svg";
+import MapPinIcon from "./map-pin.svg";
 import PhoneCallIcon from "./phone-call.svg";
 import MoreDotIcon from "./more-dot.svg";
 import BellIcon from "./bell.svg";
@@ -110,6 +111,7 @@ export {
   HorizontaLDots,
   ChevronUpIcon,
   ChatIcon,
+  MapPinIcon,
   PhoneCallIcon,
   HeadsetIcon,
 };

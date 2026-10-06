@@ -12,6 +12,7 @@ import {
   GridIcon,
   HomeIcon,
   HorizontaLDots,
+  MapPinIcon,
   PhoneCallIcon,
   PlugInIcon,
   ShootingStarIcon,
@@ -71,6 +72,14 @@ const navItems: NavItem[] = [
     icon: <BellIcon />,
     name: "Notifications",
     path: "/notifications",
+  },
+  // Site visits are the one thing in this product that happens in the physical
+  // world, and the day a broker has is organised around them — so they sit above
+  // the calendar rather than inside it.
+  {
+    icon: <MapPinIcon />,
+    name: "Site Visits",
+    path: "/site-visits",
   },
   {
     icon: <CalenderIcon />,
