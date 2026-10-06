@@ -12,7 +12,9 @@ import {
   GridIcon,
   HomeIcon,
   HorizontaLDots,
+  MapPinIcon,
   PhoneCallIcon,
+  PlugInIcon,
   ShootingStarIcon,
   TimeIcon,
   UserCircleIcon,
@@ -71,6 +73,14 @@ const navItems: NavItem[] = [
     name: "Notifications",
     path: "/notifications",
   },
+  // Site visits are the one thing in this product that happens in the physical
+  // world, and the day a broker has is organised around them — so they sit above
+  // the calendar rather than inside it.
+  {
+    icon: <MapPinIcon />,
+    name: "Site Visits",
+    path: "/site-visits",
+  },
   {
     icon: <CalenderIcon />,
     name: "Calendar",
@@ -92,6 +102,13 @@ const navItems: NavItem[] = [
     icon: <PhoneCallIcon />,
     name: "AI Callback",
     path: "/ai-callback",
+  },
+  // Where leads come from. Zoho CRM is the lead source of truth: the portals
+  // feed Zoho, and EstateFlow keeps a synced copy.
+  {
+    icon: <PlugInIcon />,
+    name: "Integrations",
+    subItems: [{ name: "Zoho CRM", path: "/integrations/zoho", pro: false, new: true }],
   },
   {
     icon: <UserCircleIcon />,
