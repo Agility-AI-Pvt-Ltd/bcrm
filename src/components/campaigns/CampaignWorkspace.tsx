@@ -468,7 +468,7 @@ export default function CampaignWorkspace() {
             <span className="mt-1.5 block text-xs text-gray-500 dark:text-gray-400">
               Meta only allows free-form messages to people who wrote to you in the last
               24 hours. To reach a cold list, name an approved template from{" "}
-              <Link href="/profile/api-management" className="text-brand-500 underline">
+              <Link href="/whatsapp-templates" className="text-brand-500 underline">
                 templates
               </Link>
               .

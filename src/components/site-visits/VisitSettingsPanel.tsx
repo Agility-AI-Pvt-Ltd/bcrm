@@ -166,7 +166,7 @@ export default function VisitSettingsPanel({ onSaved }: Props) {
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           Submit the <code>site_visit_reminder</code> and <code>post_visit_feedback</code>{" "}
           templates on{" "}
-          <Link href="/profile/api-management" className="text-brand-500 underline">
+          <Link href="/whatsapp-templates" className="text-brand-500 underline">
             WhatsApp templates
           </Link>{" "}
           so these also reach customers who have not messaged you in the last 24 hours.

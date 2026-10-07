@@ -13,7 +13,9 @@ import {
   HomeIcon,
   HorizontaLDots,
   MapPinIcon,
+  PaperPlaneIcon,
   PhoneCallIcon,
+  PieChartIcon,
   PlugInIcon,
   ShootingStarIcon,
   TimeIcon,
@@ -102,6 +104,23 @@ const navItems: NavItem[] = [
     icon: <PhoneCallIcon />,
     name: "AI Callback",
     path: "/ai-callback",
+  },
+  // The one message EstateFlow sends its own team rather than a customer: each
+  // agent's morning summary, on their personal WhatsApp. Top-level because it is
+  // the first thing a broker reads each day, and because the number it goes to is
+  // set here — not buried in a settings tab.
+  {
+    icon: <PieChartIcon />,
+    name: "Daily Digest",
+    path: "/daily-digest",
+  },
+  // Approval status gates every message EstateFlow sends first — the digest, the
+  // first touch, visit reminders. A pending template is a feature switched off, so
+  // this is a destination of its own rather than a tab inside profile settings.
+  {
+    icon: <PaperPlaneIcon />,
+    name: "WhatsApp Templates",
+    path: "/whatsapp-templates",
   },
   // Where leads come from. Zoho CRM is the lead source of truth: the portals
   // feed Zoho, and EstateFlow keeps a synced copy.

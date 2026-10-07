@@ -281,7 +281,7 @@ export default function LeadFirstTouchCard({ refreshKey }: { refreshKey?: string
       {!approved ? (
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           Submit it for review on{" "}
-          <Link href="/profile/api-management" className="text-brand-500 underline">
+          <Link href="/whatsapp-templates" className="text-brand-500 underline">
             WhatsApp templates
           </Link>
           . Until Meta approves it, new leads are queued and skipped rather than messaged.

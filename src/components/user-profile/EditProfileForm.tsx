@@ -45,6 +45,8 @@ export default function EditProfileForm() {
         last_name: String(form.get("last_name") || "").trim(),
         phone: String(form.get("phone") || "").trim() || null,
         office_phone: String(form.get("office_phone") || "").trim() || null,
+        // An empty string clears it, which is how somebody stops their digest.
+        digest_whatsapp: String(form.get("digest_whatsapp") || "").trim(),
         address: String(form.get("address") || "").trim() || null,
         office_address: String(form.get("office_address") || "").trim() || null,
         bio: String(form.get("bio") || "").trim() || null,
@@ -142,6 +144,18 @@ export default function EditProfileForm() {
                 placeholder="Office / landline"
                 className={fieldClass}
               />
+            </label>
+            <label className="block text-sm">
+              <span className="mb-1.5 block text-gray-500">Daily digest WhatsApp</span>
+              <input
+                name="digest_whatsapp"
+                defaultValue={user?.digest_whatsapp || ""}
+                placeholder="+91 … (leave empty for no digest)"
+                className={fieldClass}
+              />
+              <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+                Your own number, for the morning lead summary. Clear it to stop the digest.
+              </span>
             </label>
             <label className="block text-sm">
               <span className="mb-1.5 block text-gray-500">Bio</span>
