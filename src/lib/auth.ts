@@ -7,6 +7,8 @@ export type AuthUser = {
   last_name: string;
   phone?: string | null;
   office_phone?: string | null;
+  /** This person's own WhatsApp number, where their daily digest is sent. */
+  digest_whatsapp?: string | null;
   address?: string | null;
   office_address?: string | null;
   work_locations?: string[];
@@ -296,6 +298,8 @@ export async function updateProfile(payload: {
   last_name?: string;
   phone?: string | null;
   office_phone?: string | null;
+  /** An empty string clears it and stops the digest; omit to leave it alone. */
+  digest_whatsapp?: string | null;
   address?: string | null;
   office_address?: string | null;
   work_locations?: string[];
