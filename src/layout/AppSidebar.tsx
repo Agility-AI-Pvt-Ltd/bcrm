@@ -12,6 +12,7 @@ import {
   GridIcon,
   HomeIcon,
   HorizontaLDots,
+  DocsIcon,
   MapPinIcon,
   PaperPlaneIcon,
   PhoneCallIcon,
@@ -113,6 +114,21 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "Daily Digest",
     path: "/daily-digest",
+  },
+  // Where the money went. Top-level because "which portal should I cancel?" is a
+  // question a broker asks every month and could not answer at all before.
+  {
+    icon: <PieChartIcon />,
+    name: "Reporting",
+    path: "/reporting",
+  },
+  // Commission protection. Sits next to Site Visits because the two halves of an
+  // attribution claim are the registration and the visit, and a broker chasing one
+  // is usually about to need the other.
+  {
+    icon: <DocsIcon />,
+    name: "Lead Registration",
+    path: "/lead-registration",
   },
   // Approval status gates every message EstateFlow sends first — the digest, the
   // first touch, visit reminders. A pending template is a feature switched off, so

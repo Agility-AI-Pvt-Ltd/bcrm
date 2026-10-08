@@ -8,11 +8,18 @@ import Badge from "@/components/ui/badge/Badge";
 import Pagination from "@/components/tables/Pagination";
 import { ApiError } from "@/lib/api";
 import {
+  areaLabel,
   formatPropertyPrice,
+  getTrustSettings,
   isPropertyView,
   listPropertiesByView,
+  loadingPercent,
   propertyStatusLabel,
   PROPERTY_VIEW_LABELS,
+  verificationLabel,
+  verificationState,
+  verifyProperty,
+  VERIFICATION_CHIP,
   type PropertyRecord,
   type PropertyView,
 } from "@/lib/properties";
@@ -26,8 +33,88 @@ function statusColor(status: string): "success" | "warning" | "dark" {
   return "dark";
 }
 
+/**
+ * "4 photos · 1 video", or what is missing.
+ *
+ * Worth a column of its own: a listing with no photos is the one a customer stops
+ * replying to, and until now there was no way to see which those were without
+ * opening each one.
+ */
+function mediaLabel(property: PropertyRecord): { text: string; thin: boolean } {
+  const photos = (property.image_urls || []).filter(Boolean).length;
+  const videos = (property.video_urls || []).filter(Boolean).length;
+  if (!photos && !videos) return { text: "None", thin: true };
+  const parts: string[] = [];
+  if (photos) parts.push(`${photos} photo${photos === 1 ? "" : "s"}`);
+  if (videos) parts.push(`${videos} video${videos === 1 ? "" : "s"}`);
+  return { text: parts.join(" · "), thin: !photos };
+}
+
+
+/**
+ * The trust column: when a person last confirmed this listing, its RERA number and
+ * its carpet area.
+ *
+ * Shown on the list rather than only on a detail page because the question a broker
+ * actually has is "which of my listings would a customer not believe?", and that is
+ * a question about the whole page at once.
+ */
+function TrustCell({
+  property,
+  validDays,
+  onVerify,
+  busy,
+}: {
+  property: PropertyRecord;
+  validDays: number;
+  onVerify: (property: PropertyRecord) => void;
+  busy: boolean;
+}) {
+  const state = verificationState(property.verified_at, validDays);
+  const loading = loadingPercent(property);
+  const area = areaLabel(property);
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <span
+          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${VERIFICATION_CHIP[state]}`}
+        >
+          {verificationLabel(property.verified_at)}
+        </span>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onVerify(property)}
+          className="text-xs text-brand-500 underline underline-offset-2 disabled:opacity-50"
+        >
+          {busy ? "Saving…" : state === "never" ? "Verify" : "Re-verify"}
+        </button>
+      </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        {property.rera_number ? (
+          <span title="As given by the seller; not checked with the RERA authority.">
+            RERA {property.rera_number}
+          </span>
+        ) : (
+          <span className="text-warning-600">No RERA number</span>
+        )}
+      </p>
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        {area || <span className="text-warning-600">No area</span>}
+        {loading !== null ? (
+          <span className="text-warning-600"> · {loading}% loading</span>
+        ) : null}
+      </p>
+    </div>
+  );
+}
+
 export default function PropertyListView() {
   const router = useRouter();
+  // The agency's own window for how long a confirmation stays believable. Read once
+  // for the page so every row's badge is judged by the same rule.
+  const [validDays, setValidDays] = useState(30);
+  const [verifying, setVerifying] = useState("");
   const params = useSearchParams();
 
   const rawView = params.get("view");
@@ -59,6 +146,33 @@ export default function PropertyListView() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    // Best effort: a failure here just leaves the default 30-day window, which is
+    // better than refusing to render the list.
+    void (async () => {
+      try {
+        const settings = await getTrustSettings();
+        setValidDays(settings.verification_valid_days || 30);
+      } catch {
+        setValidDays(30);
+      }
+    })();
+  }, []);
+
+  /** Confirm a listing is still real. Updates the one row rather than reloading. */
+  const onVerify = async (property: PropertyRecord) => {
+    setVerifying(property.id);
+    setError("");
+    try {
+      const updated = await verifyProperty(property.id, true);
+      setItems((rows) => rows.map((row) => (row.id === updated.id ? updated : row)));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Could not verify that listing.");
+    } finally {
+      setVerifying("");
+    }
+  };
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -137,6 +251,8 @@ export default function PropertyListView() {
                 <th className="px-5 py-3 font-medium">BHK</th>
                 <th className="px-5 py-3 font-medium">Listing</th>
                 <th className="px-5 py-3 font-medium">Price</th>
+                <th className="px-5 py-3 font-medium">Media</th>
+                <th className="px-5 py-3 font-medium">Trust</th>
                 <th className="px-5 py-3 font-medium">Source</th>
                 <th className="px-5 py-3 font-medium">Status</th>
               </tr>
@@ -144,13 +260,13 @@ export default function PropertyListView() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={9} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
                     Loading properties…
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={9} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
                     Nothing to show here.
                   </td>
                 </tr>
@@ -171,6 +287,23 @@ export default function PropertyListView() {
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 text-gray-500 dark:text-gray-400">
                       {formatPropertyPrice(property)}
+                    </td>
+                    <td
+                      className={`whitespace-nowrap px-5 py-4 ${
+                        mediaLabel(property).thin
+                          ? "text-warning-600"
+                          : "text-gray-500 dark:text-gray-400"
+                      }`}
+                    >
+                      {mediaLabel(property).text}
+                    </td>
+                    <td className="px-5 py-4">
+                      <TrustCell
+                        property={property}
+                        validDays={validDays}
+                        onVerify={onVerify}
+                        busy={verifying === property.id}
+                      />
                     </td>
                     <td className="whitespace-nowrap px-5 py-4">
                       <Badge color={property.source === "sheet" ? "info" : "light"} size="sm">
