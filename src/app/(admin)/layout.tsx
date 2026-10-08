@@ -25,8 +25,15 @@ export default function AdminLayout({
       <div className="min-h-screen xl:flex">
         <AppSidebar />
         <Backdrop />
+        {/* `min-w-0` is load-bearing. A flex child defaults to `min-width: auto`,
+            which means its *content's* intrinsic width wins over the container —
+            so one wide table anywhere inside pushed this div past the viewport and
+            the whole page scrolled sideways, carrying the sidebar off-screen with
+            it. With `min-w-0` the div stays the width of the screen and a wide
+            table scrolls inside its own `overflow-x-auto` card, which is what that
+            wrapper was always for. */}
         <div
-          className={`flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}
+          className={`min-w-0 flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}
         >
           <AppHeader />
           <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">{children}</div>

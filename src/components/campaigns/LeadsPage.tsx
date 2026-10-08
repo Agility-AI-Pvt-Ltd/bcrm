@@ -462,17 +462,34 @@ export default function LeadsPage() {
           })}
         </div>
 
+        {/* `min-w-max` here meant "never narrower than my widest row", which with nine
+            never-wrapping columns is wider than any laptop. Paired with a flex ancestor
+            that had no `min-w-0`, that is what made the whole page scroll sideways.
+
+            The columns a broker scans least often now give way first, so the ones they
+            act on — who, what they said, and the call button — always fit. The
+            breakpoints look arbitrary because they are measured: the table only gets
+            the viewport minus the 290px sidebar and 48px of padding, so each column
+            has to wait about 340px longer than a plain `lg:`/`xl:` would imply. Nothing
+            is lost when a column is hidden; every one of them has a title tooltip, and
+            they all come back on a wide monitor. */}
         <div className="overflow-x-auto">
-          <table className="w-full min-w-max text-left text-sm">
+          <table className="w-full min-w-[46rem] text-left text-sm">
             <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
               <tr>
                 <th className="px-5 py-3 font-medium">Lead</th>
                 <th className="px-5 py-3 font-medium">What they said</th>
                 <th className="px-5 py-3 font-medium">Stage</th>
-                <th className="px-5 py-3 font-medium">Engagement</th>
-                <th className="px-5 py-3 font-medium">Looking for</th>
-                <th className="px-5 py-3 font-medium">Messaged</th>
-                <th className="px-5 py-3 font-medium">Replies</th>
+                <th className="hidden px-5 py-3 font-medium min-[1320px]:table-cell">Engagement</th>
+                <th className="hidden px-5 py-3 font-medium min-[1740px]:table-cell">
+                  Looking for
+                </th>
+                <th className="hidden px-5 py-3 font-medium min-[1900px]:table-cell">
+                  Messaged
+                </th>
+                <th className="hidden px-5 py-3 font-medium min-[1420px]:table-cell">
+                  Replies
+                </th>
                 <th className="px-5 py-3 font-medium">Last reply</th>
                 <th className="px-5 py-3 font-medium">Callback</th>
               </tr>
@@ -598,7 +615,7 @@ function LeadRow({
       <td className="px-5 py-3">
         {lead.last_reply_text ? (
           <p
-            className="max-w-[340px] truncate italic text-gray-700 dark:text-gray-300"
+            className="max-w-[14rem] truncate italic text-gray-700 dark:text-gray-300"
             title={lead.last_reply_text}
           >
             “{lead.last_reply_text}”
@@ -617,7 +634,7 @@ function LeadRow({
           {lead.customer_stage}
         </Badge>
       </td>
-      <td className="px-5 py-3">
+      <td className="hidden px-5 py-3 min-[1320px]:table-cell">
         <div className="flex items-center gap-2">
           <Badge color={tierBadgeColor(lead.engagement_tier)} size="sm">
             {lead.engagement_tier}
@@ -633,7 +650,7 @@ function LeadRow({
         </div>
       </td>
       <td
-        className="max-w-[200px] truncate px-5 py-3 text-gray-600 dark:text-gray-400"
+        className="hidden max-w-[200px] truncate px-5 py-3 text-gray-600 min-[1740px]:table-cell dark:text-gray-400"
         title={wants}
       >
         {wants || "—"}
@@ -641,7 +658,7 @@ function LeadRow({
       {/* Kept from the old pipeline board. In the "Everyone" scope a contact
           who has never replied has no reply text and no reply date, so this is
           the only evidence on the row that we have reached out at all. */}
-      <td className="px-5 py-3 text-gray-500">
+      <td className="hidden px-5 py-3 text-gray-500 min-[1900px]:table-cell">
         {lead.messaged_count}
         {lead.first_messaged_at ? (
           <span
@@ -652,7 +669,7 @@ function LeadRow({
           </span>
         ) : null}
       </td>
-      <td className="px-5 py-3 text-gray-500">{lead.reply_count}</td>
+      <td className="hidden px-5 py-3 text-gray-500 min-[1420px]:table-cell">{lead.reply_count}</td>
       <td className="px-5 py-3 text-gray-500" title={formatWhen(lead.last_reply_at)}>
         {formatSince(lead.last_reply_at)}
       </td>
