@@ -31,6 +31,20 @@ export type PropertyRecord = {
   amenities: string[];
   nearby_places: NearbyPlace[];
   image_urls: string[];
+  /** Walkthrough videos. A buyer asks for one by name, and it is not a photo. */
+  video_urls: string[];
+  // --- trust signals ---
+  /** When a *person* last confirmed this is still available at this price. */
+  verified_at: string | null;
+  verified_by_user_id: string | null;
+  /** As given by the seller. We do not check it with the RERA authority. */
+  rera_number: string | null;
+  carpet_area_sqft: number | null;
+  builtup_area_sqft: number | null;
+  super_area_sqft: number | null;
+  maintenance_monthly: string | number | null;
+  /** One-time charges on a sale: {"Covered parking": "300000"}. */
+  other_charges: Record<string, string>;
   /** "sheet" for listings mirrored from a connected spreadsheet. */
   source: "manual" | "sheet" | "import" | string;
   sheet_connection_id: string | null;
@@ -139,6 +153,9 @@ export const PROPERTY_FIELD_LABELS: Record<string, string> = {
   amenities: "Amenities",
   description: "Description",
   image_urls: "Image URLs",
+  video_urls: "Video URLs",
+  rera_number: "RERA number",
+  maintenance_monthly: "Monthly maintenance",
 };
 
 export type PropertyImportColumn = {
@@ -230,4 +247,138 @@ export function propertyStatusLabel(status: string | null | undefined) {
     SOLD: "Sold",
   };
   return named[raw.toUpperCase()] || raw;
+}
+
+
+// ---------------------------------------------------------------------------
+// Trust signals
+// ---------------------------------------------------------------------------
+
+/**
+ * The four facts a buyer checks before believing a listing: when a person last
+ * confirmed it, its RERA number, its carpet area, and what it actually costs.
+ *
+ * The rates behind the all-in cost are the agency's own. Nothing is assumed on
+ * their behalf — stamp duty varies by state and by the buyer's gender, so a
+ * national average would be wrong everywhere by lakhs. Until an agency enters its
+ * rates, `missing` says so and every all-in on a card reads "from".
+ */
+export type TrustSettings = {
+  verification_valid_days: number;
+  stamp_duty_pct: string | null;
+  registration_pct: string | null;
+  registration_cap: string | null;
+  gst_pct: string | null;
+  brokerage_pct: string | null;
+  rent_brokerage_months: string | null;
+  show_all_in: boolean;
+  show_unverified_badge: boolean;
+  /** Which rates still have to be entered before an all-in can be complete. */
+  missing: string[];
+};
+
+export type TrustSettingsUpdate = Partial<Omit<TrustSettings, "missing">>;
+
+export type TrustSummary = {
+  total: number;
+  verified_fresh: number;
+  verified_ageing: number;
+  verified_stale: number;
+  never_verified: number;
+  with_rera: number;
+  with_carpet_area: number;
+  with_all_in: number;
+};
+
+export type VerificationState = "fresh" | "ageing" | "stale" | "never";
+
+export const getTrustSettings = () =>
+  apiFetch<TrustSettings>("/api/v1/properties/trust/settings");
+
+export const saveTrustSettings = (payload: TrustSettingsUpdate) =>
+  apiFetch<TrustSettings>("/api/v1/properties/trust/settings", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+export const getTrustSummary = () =>
+  apiFetch<TrustSummary>("/api/v1/properties/trust/summary");
+
+export const verifyProperty = (propertyId: string, verified = true) =>
+  apiFetch<PropertyRecord>(`/api/v1/properties/${propertyId}/verify`, {
+    method: "POST",
+    body: JSON.stringify({ verified }),
+  });
+
+/**
+ * How old a confirmation is allowed to get, mirroring the server's rule so the
+ * screen and the customer's WhatsApp card never disagree about the same listing.
+ * The last quarter of the window is amber, which is the broker's warning.
+ */
+export function verificationState(
+  verifiedAt: string | null,
+  validDays = 30,
+): VerificationState {
+  if (!verifiedAt) return "never";
+  const at = new Date(verifiedAt);
+  if (Number.isNaN(at.getTime())) return "never";
+  const days = Math.max(0, Math.floor((Date.now() - at.getTime()) / 86_400_000));
+  const window = Math.max(1, validDays);
+  if (days > window) return "stale";
+  if (days >= window * 0.75) return "ageing";
+  return "fresh";
+}
+
+export function verificationLabel(verifiedAt: string | null): string {
+  if (!verifiedAt) return "Not verified";
+  const at = new Date(verifiedAt);
+  if (Number.isNaN(at.getTime())) return "Not verified";
+  const days = Math.max(0, Math.floor((Date.now() - at.getTime()) / 86_400_000));
+  if (days === 0) return "Verified today";
+  if (days === 1) return "Verified yesterday";
+  if (days < 30) return `Verified ${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `Verified ${months}mo ago`;
+}
+
+export const VERIFICATION_CHIP: Record<VerificationState, string> = {
+  fresh: "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-500",
+  ageing: "bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-500",
+  stale: "bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500",
+  never: "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300",
+};
+
+/** "1,045 sq ft carpet" — and which area it actually is. */
+export function areaLabel(property: PropertyRecord): string {
+  if (property.carpet_area_sqft) {
+    return `${Math.round(property.carpet_area_sqft).toLocaleString()} sq ft carpet`;
+  }
+  if (property.builtup_area_sqft) {
+    return `${Math.round(property.builtup_area_sqft).toLocaleString()} sq ft built-up`;
+  }
+  if (property.super_area_sqft) {
+    return `${Math.round(property.super_area_sqft).toLocaleString()} sq ft super`;
+  }
+  return property.carpet_area || "";
+}
+
+/** The number buyers argue about: advertised area minus what they can stand in. */
+export function loadingPercent(property: PropertyRecord): number | null {
+  const carpet = property.carpet_area_sqft;
+  const sba = property.super_area_sqft;
+  if (!carpet || !sba || sba < carpet) return null;
+  return Math.round(((sba - carpet) / carpet) * 1000) / 10;
+}
+
+/** ₹65 L / ₹1.2 Cr / ₹25,000 — how prices are read here, not in millions. */
+export function moneyLabel(value: string | number | null | undefined): string {
+  const amount = typeof value === "string" ? Number(value) : value;
+  if (!amount || Number.isNaN(amount)) return "—";
+  if (amount >= 10_000_000) return `₹${trimZeros(amount / 10_000_000)} Cr`;
+  if (amount >= 100_000) return `₹${trimZeros(amount / 100_000)} L`;
+  return `₹${Math.round(amount).toLocaleString("en-IN")}`;
+}
+
+function trimZeros(value: number): string {
+  return String(Math.round(value * 100) / 100);
 }
