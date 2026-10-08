@@ -122,6 +122,15 @@ const navItems: NavItem[] = [
     name: "Reporting",
     path: "/reporting",
   },
+  // Consent, customer data requests, WhatsApp cost and the number's standing. Its
+  // own destination rather than a settings tab: a deletion request has a deadline,
+  // and a quality-rating drop cuts how many people the agency can message a day —
+  // neither is something to find by accident.
+  {
+    icon: <DocsIcon />,
+    name: "Compliance",
+    path: "/compliance",
+  },
   // Commission protection. Sits next to Site Visits because the two halves of an
   // attribution claim are the registration and the visit, and a broker chasing one
   // is usually about to need the other.
