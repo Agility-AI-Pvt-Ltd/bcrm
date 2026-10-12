@@ -162,6 +162,56 @@ export function needsAction(status: string): boolean {
   return ["REJECTED", "DRAFT", "SUBMIT_FAILED", "NOT_SUBMITTED"].includes(status);
 }
 
+/** The `{{1}}`-style placeholders in a template body, in the order they appear. */
+export function templateTokens(body: string): string[] {
+  const seen: string[] = [];
+  for (const match of body.matchAll(/\{\{(\d+)\}\}/g)) {
+    if (!seen.includes(match[1])) seen.push(match[1]);
+  }
+  return seen;
+}
+
+export type TemplateVariable = { token: string; label: string; sample: string };
+
+/**
+ * One row per placeholder: what it is for, and the example Meta was shown.
+ *
+ * Read off the body rather than off `variable_labels`, because the body is the
+ * thing Meta approved — a label with no placeholder left in the wording is not a
+ * variable any more, and a placeholder nobody labelled still has to be listed.
+ */
+export function templateVariables(
+  body: string,
+  labels: Record<string, string>,
+  samples: Record<string, string>,
+): TemplateVariable[] {
+  return templateTokens(body).map((token) => ({
+    token,
+    label: labels[token] || "—",
+    sample: samples[token] || "",
+  }));
+}
+
+/**
+ * The body with the example values filled in — what the customer would read.
+ *
+ * A placeholder with no sample keeps its label in square brackets rather than
+ * vanishing: an empty gap would make the message look shorter and cleaner than
+ * it will actually be.
+ */
+export function fillTemplate(
+  body: string,
+  samples: Record<string, string>,
+  labels: Record<string, string> = {},
+): string {
+  return body.replace(/\{\{(\d+)\}\}/g, (whole, token: string) => {
+    const sample = samples[token];
+    if (sample) return sample;
+    const label = labels[token];
+    return label ? `[${label}]` : whole;
+  });
+}
+
 export function formatStamp(value: string | null): string {
   if (!value) return "—";
   const date = new Date(value);

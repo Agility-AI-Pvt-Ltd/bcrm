@@ -36,13 +36,26 @@ export function formatDuration(seconds: number | null): string | null {
   return m > 0 ? `${m} min ${s} s` : `${s} s`;
 }
 
+/**
+ * What the post-call WhatsApp actually carried. "Details sent on WhatsApp" was
+ * shown for a message that contained no details at all, so the count is named:
+ * homes if the inventory had any, and the handoff if it did not.
+ */
+function whatsappFact(call: AiCallDetail): string | null {
+  if (call.whatsapp_followup !== "sent") return null;
+  const sent = call.listings_sent;
+  if (sent === null || sent === undefined) return "details sent on WhatsApp";
+  if (sent === 0) return "no matching listing — handed to an agent";
+  return `${sent} ${sent === 1 ? "option" : "options"} sent on WhatsApp`;
+}
+
 export default function AiCallDetails({ call }: { call: AiCallDetail }) {
   const requirements = Object.entries(call.requirements || {});
   const facts = [
     formatDuration(call.duration_seconds),
     call.language ? LANGUAGE_NAMES[call.language] ?? call.language : null,
     call.outcome ? call.outcome.replace(/_/g, " ") : null,
-    call.whatsapp_followup === "sent" ? "details sent on WhatsApp" : null,
+    whatsappFact(call),
   ].filter(Boolean);
 
   return (
