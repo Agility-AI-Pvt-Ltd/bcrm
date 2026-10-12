@@ -17,6 +17,7 @@ import {
   type TemplateSummary,
 } from "@/lib/whatsappTemplates";
 import RequiredTemplatesPanel from "./RequiredTemplatesPanel";
+import TemplateDetailModal from "./TemplateDetailModal";
 
 /**
  * One screen that answers "which of my templates are approved, and which are pending?"
@@ -39,6 +40,7 @@ export default function TemplatesPage() {
   const [notice, setNotice] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [busy, setBusy] = useState("");
+  const [open, setOpen] = useState<OrganizationTemplate | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -50,6 +52,11 @@ export default function TemplatesPage() {
       setSummary(loadedSummary);
       setMine(loadedMine);
       setCatalog(loadedCatalog);
+      // The modal holds a copy of one row, so a reload has to hand it the new
+      // one — otherwise submitting from in there leaves a stale status on screen.
+      setOpen((current) =>
+        current ? loadedMine.find((row) => row.id === current.id) ?? null : null,
+      );
       setError("");
     } catch (err) {
       setError(failureText(err, "Could not load your WhatsApp templates."));
@@ -182,7 +189,8 @@ export default function TemplatesPage() {
           Your templates
         </h3>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Everything submitted from this account, newest review state first.
+          Everything submitted from this account, newest review state first. Open one to
+          read the message it sends.
         </p>
 
         {mine.length ? (
@@ -195,13 +203,26 @@ export default function TemplatesPage() {
                   <th className="py-2 pr-4 font-medium">Status</th>
                   <th className="py-2 pr-4 font-medium">Submitted</th>
                   <th className="py-2 pr-4 font-medium">Approved</th>
+                  <th className="py-2 font-medium">
+                    <span className="sr-only">Open</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {mine.map((row) => (
                   <tr
                     key={row.id}
-                    className="border-b border-gray-100 last:border-0 dark:border-gray-800/60"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open ${row.meta_template_name}`}
+                    onClick={() => setOpen(row)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setOpen(row);
+                      }
+                    }}
+                    className="cursor-pointer border-b border-gray-100 last:border-0 hover:bg-gray-50 focus:outline-none focus-visible:bg-gray-50 dark:border-gray-800/60 dark:hover:bg-white/[0.04] dark:focus-visible:bg-white/[0.04]"
                   >
                     <td className="py-2.5 pr-4">
                       <code className="text-gray-800 dark:text-white/90">
@@ -233,6 +254,11 @@ export default function TemplatesPage() {
                     </td>
                     <td className="py-2.5 pr-4 text-gray-600 dark:text-gray-300">
                       {formatStamp(row.approved_at)}
+                    </td>
+                    <td className="py-2.5 text-right">
+                      <span className="text-xs text-brand-500 underline underline-offset-2">
+                        View
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -288,6 +314,15 @@ export default function TemplatesPage() {
           </ul>
         </section>
       ) : null}
+
+      <TemplateDetailModal
+        template={open}
+        onClose={() => setOpen(null)}
+        onSubmitted={() => {
+          setNotice(`${open?.meta_template_name ?? "Template"} sent to Meta for review.`);
+          refresh();
+        }}
+      />
     </div>
   );
 }

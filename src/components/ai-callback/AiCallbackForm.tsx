@@ -218,7 +218,8 @@ export default function AiCallbackForm() {
             status
           </Link>{" "}
           except Available — when you&rsquo;re Available, you handle new enquiries yourself. Each
-          enquiry is called at most once, nobody is called twice within 7 days, and customers who
+          enquiry is called at most once. A number is not called again within 7 days if that earlier
+          call already collected their requirements — missed or empty calls do not count. Customers who
           opted out or are being handled by a person are never called.
         </p>
       </div>

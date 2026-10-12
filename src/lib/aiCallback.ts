@@ -79,6 +79,9 @@ export type AiCallDetail = {
   /** Why the call failed, in words a broker can act on. */
   failure_reason: string | null;
   whatsapp_followup: string | null;
+  /** Listings in the post-call WhatsApp. 0 = nothing matched, so a person
+   *  was handed the chat. null = a call from before the follow-up searched. */
+  listings_sent?: number | null;
   ai_callback: AiCallbackView;
 };
 
