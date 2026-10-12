@@ -2,8 +2,14 @@
 
 /**
  * The AI callback, as the Messages screen shows it: a live countdown while the
- * timer runs ("AI call in 4:32"), then whether the call is ringing, done or
- * failed. A compact badge for the chat list, a fuller strip for the chat header.
+ * timer runs ("Asking to call in 4:32"), then that we have asked, then whether
+ * the call is ringing, done or failed. A compact badge for the chat list, a
+ * fuller strip for the chat header.
+ *
+ * The countdown is to the *question*, not to the call — nobody is phoned without
+ * saying yes first — so once the question has gone out the clock stops and the
+ * badge says we are waiting on the customer. Showing a countdown there would
+ * imply the call is coming either way.
  */
 
 import { useEffect, useState } from "react";
@@ -78,7 +84,9 @@ function useCountdown(secondsLeft: number | null): number | null {
 function useLabel(view: AiCallbackView): string {
   const left = useCountdown(view.phase === "scheduled" ? view.seconds_left : null);
   if (view.phase === "scheduled") {
-    return left && left > 0 ? `AI call in ${formatCountdown(left)}` : "Placing AI call…";
+    return left && left > 0
+      ? `Asking to call in ${formatCountdown(left)}`
+      : "Asking permission to call…";
   }
   return view.label;
 }
@@ -100,7 +108,14 @@ export function AiCallbackBadge({ view }: { view: AiCallbackView }) {
 export function AiCallbackStrip({ view }: { view: AiCallbackView }) {
   const label = useLabel(view);
   const styles = tone(view);
-  const live = ["scheduled", "checking", "dialing", "ringing", "on_call"].includes(view.phase);
+  const live = [
+    "scheduled",
+    "checking",
+    "awaiting_consent",
+    "dialing",
+    "ringing",
+    "on_call",
+  ].includes(view.phase);
   return (
     <div
       role="status"

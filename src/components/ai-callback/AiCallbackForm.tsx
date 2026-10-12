@@ -14,7 +14,8 @@ const fieldClass =
 
 const STEPS = [
   "A customer messages you on WhatsApp — even just “hi” — and the AI replies.",
-  "If they don’t reply to the AI within the wait below, the AI phones them.",
+  "If they go quiet for the wait below, the AI asks them on WhatsApp whether it may call: “can we make a quick call to understand your requirement?”, with Yes and No buttons.",
+  "They say yes — the phone rings about a minute later. They say no, or they carry on chatting instead — nobody is called.",
   "On the call it asks 3–4 quick questions: budget, BHK, locality and move-in date, in whatever language the customer speaks.",
   "It tells them their requirements are noted and complete details are coming on WhatsApp.",
   "Right after the call, matching options are sent to their WhatsApp number.",
@@ -133,12 +134,14 @@ export default function AiCallbackForm() {
         />
         <p className="text-sm text-gray-700 dark:text-gray-200">
           {live
-            ? `On. Quiet new enquiries are called ${settings.delay_minutes} minute${
+            ? `On. A quiet new enquiry is asked for permission to call ${
+                settings.delay_minutes
+              } minute${
                 settings.delay_minutes === 1 ? "" : "s"
-              } after the AI’s reply, at any time, unless your status is Available.`
+              } after the AI’s reply, and only called if they say yes — at any time, unless your status is Available.`
             : settings.enabled
               ? "Switched on, but calls can’t be placed yet — see below."
-              : "Off. Nobody is called; enquiries are handled on WhatsApp only."}
+              : "Off. Nobody is asked and nobody is called; enquiries are handled on WhatsApp only."}
         </p>
       </div>
 
@@ -168,7 +171,7 @@ export default function AiCallbackForm() {
       <form onSubmit={onSave} className="mt-6 rounded-xl border border-gray-100 p-4 dark:border-gray-800">
         <label className="block">
           <span className="mb-1.5 block text-sm font-medium text-gray-800 dark:text-white/90">
-            Call after
+            Ask to call after
           </span>
           <span className="flex flex-wrap items-center gap-3">
             <input
@@ -196,7 +199,8 @@ export default function AiCallbackForm() {
         </label>
         <p className="mt-2 text-xs text-gray-500">
           Between {settings.min_delay_minutes} and {settings.max_delay_minutes} minutes. If the
-          customer replies on WhatsApp first, they are not called.
+          customer replies on WhatsApp first they are never asked, and nobody is called without
+          their yes.
         </p>
       </form>
 

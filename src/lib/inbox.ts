@@ -118,6 +118,8 @@ export type ServiceWindow = {
 export type AiCallbackPhase =
   | "scheduled"
   | "checking"
+  /** The "can we call you?" message has gone out; the answer decides. */
+  | "awaiting_consent"
   | "cancelled"
   | "skipped"
   | "dialing"
@@ -137,6 +139,8 @@ export type AiCallbackView = {
   call_status: string | null;
   outcome: string | null;
   whatsapp_status: string | null;
+  /** asked | granted | refused | unanswered — null before we asked. */
+  consent_status?: string | null;
 };
 
 /** Phases that will change on their own, so the screen should keep checking. */
