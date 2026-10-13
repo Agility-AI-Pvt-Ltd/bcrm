@@ -7,17 +7,27 @@ import {
   QUALITY_CHIP,
   QUALITY_LABEL,
   TABLE_LABEL,
+  answerAccessRequest,
   createDataRequest,
+  downloadJson,
   dueLabel,
+  exportPerson,
   fulfilRequest,
   getComplianceOverview,
   getHoldings,
+  refreshMessagingHealth,
   rupees,
+  safeFilePart,
+  sendLimitLabel,
   shortDate,
+  whenLabel,
   type ComplianceOverview,
   type DataRequest,
   type Holdings,
+  type MessagingHealth,
 } from "@/lib/compliance";
+import ConsentPeoplePanel from "./ConsentPeoplePanel";
+import RetentionPanel from "./RetentionPanel";
 
 const input =
   "h-10 rounded-lg border border-gray-300 bg-transparent px-3 text-sm outline-none focus:border-brand-500 dark:border-gray-700 dark:text-white/90";
@@ -50,6 +60,10 @@ export default function CompliancePage() {
   const [holdings, setHoldings] = useState<Holdings | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<DataRequest | null>(null);
+  // Set only by the refresh button, so the panel repaints from Meta's answer
+  // without a second load of the whole page.
+  const [refreshed, setRefreshed] = useState<MessagingHealth | null>(null);
+  const [checking, setChecking] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -104,6 +118,75 @@ export default function CompliancePage() {
     }
   };
 
+  /**
+   * Answer an access request: hand over the file, then close the obligation.
+   *
+   * The page used to tell an admin to "use Download data" and there was no such
+   * button anywhere — the one request type with a legal clock had no way to
+   * finish. Closing is a separate call from the export on purpose: the export is
+   * also how somebody is looked up before a deletion, and a read that quietly
+   * closed an obligation would be a trap.
+   */
+  const onDownload = async (request: DataRequest) => {
+    const phone = request.phone;
+    if (!phone) return;
+    setBusy(true);
+    setError("");
+    try {
+      const data = await exportPerson(phone);
+      downloadJson(data, `data-export-${safeFilePart(phone)}.json`);
+      await answerAccessRequest(request.id);
+      setNotice("Data downloaded, and the request is marked answered.");
+      await load();
+    } catch (err) {
+      setError(failureText(err, "Could not put that export together."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onDownloadLookup = async () => {
+    const phone = lookup.trim();
+    if (!phone) return;
+    setBusy(true);
+    setError("");
+    try {
+      const data = await exportPerson(phone);
+      downloadJson(data, `data-export-${safeFilePart(phone)}.json`);
+      setNotice("Downloaded. Nothing was closed — this is a look-up, not an answer.");
+    } catch (err) {
+      setError(failureText(err, "Could not put that export together."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onCheckNumber = async () => {
+    setChecking(true);
+    setError("");
+    try {
+      const result = await refreshMessagingHealth();
+      setRefreshed(result.health);
+      if (!result.reached) {
+        setError(
+          result.error === "whatsapp_not_connected"
+            ? "WhatsApp is not connected, so Meta has nothing to tell us about the number yet."
+            : "Meta would not tell us the number's rating just now. Nothing has changed.",
+        );
+      } else {
+        setNotice(
+          result.changed
+            ? "Meta reports a different rating — the panel below is updated."
+            : "Checked with Meta. The rating has not changed.",
+        );
+      }
+    } catch (err) {
+      setError(failureText(err, "Could not reach Meta to check the number."));
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const onFulfil = async (request: DataRequest) => {
     setBusy(true);
     setError("");
@@ -136,8 +219,10 @@ export default function CompliancePage() {
   }
   if (!overview) return null;
 
-  const { consent, messaging, rules, open_requests: open } = overview;
+  const { consent, rules, open_requests: open } = overview;
+  const messaging = refreshed ?? overview.messaging;
   const quality = messaging.quality;
+  const sendLimit = sendLimitLabel(quality.messaging_limit);
 
   return (
     <div className="space-y-5">
@@ -184,6 +269,12 @@ export default function CompliancePage() {
           <Figure label="Asked us to stop" value={consent.withdrawn} />
           <Figure label="Records held" value={consent.records} />
         </div>
+        <ConsentPeoplePanel
+          onLookup={(phone) => {
+            setLookup(phone);
+            setHoldings(null);
+          }}
+        />
       </section>
 
       {/* --- requests --------------------------------------------------- */}
@@ -232,16 +323,26 @@ export default function CompliancePage() {
                       Review and delete
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLookup(request.phone || "");
-                        setHoldings(null);
-                      }}
-                      className="h-9 rounded-lg border border-gray-300 px-3 text-sm font-medium dark:border-gray-700 dark:text-white/90"
-                    >
-                      Look up their data
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={busy || !request.phone}
+                        onClick={() => void onDownload(request)}
+                        className="h-9 rounded-lg bg-brand-500 px-3 text-sm font-medium text-white disabled:opacity-50"
+                      >
+                        Download data
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLookup(request.phone || "");
+                          setHoldings(null);
+                        }}
+                        className="h-9 rounded-lg border border-gray-300 px-3 text-sm font-medium dark:border-gray-700 dark:text-white/90"
+                      >
+                        Look up their data
+                      </button>
+                    </div>
                   )}
                 </div>
               </li>
@@ -262,6 +363,9 @@ export default function CompliancePage() {
                   {typeof request.outcome?.deleted_total === "number"
                     ? `, ${request.outcome.deleted_total} records removed`
                     : ""}
+                  {/* Null on requests closed before this was recorded, which is
+                      honest — it is not backfilled with a guess. */}
+                  {request.completed_by ? ` · by ${request.completed_by}` : ""}
                 </li>
               ))}
             </ul>
@@ -296,6 +400,14 @@ export default function CompliancePage() {
             className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-medium disabled:opacity-50 dark:border-gray-700 dark:text-white/90"
           >
             Log an access request
+          </button>
+          <button
+            type="button"
+            disabled={busy || !lookup.trim()}
+            onClick={() => void onDownloadLookup()}
+            className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-medium disabled:opacity-50 dark:border-gray-700 dark:text-white/90"
+          >
+            Download data
           </button>
           <button
             type="button"
@@ -349,6 +461,14 @@ export default function CompliancePage() {
         ) : null}
       </section>
 
+      {/* --- the promise about how long files are kept ------------------- */}
+      <RetentionPanel
+        onPurged={(message) => {
+          setNotice(message);
+          void load();
+        }}
+      />
+
       {/* --- WhatsApp cost and standing --------------------------------- */}
       <section className={card}>
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -358,14 +478,34 @@ export default function CompliancePage() {
               What the messages cost, and what they are doing to your number.
             </p>
           </div>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              QUALITY_CHIP[quality.quality] || QUALITY_CHIP.UNKNOWN
-            }`}
-          >
-            Number quality: {QUALITY_LABEL[quality.quality] || quality.quality}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                QUALITY_CHIP[quality.quality] || QUALITY_CHIP.UNKNOWN
+              }`}
+            >
+              Number quality: {QUALITY_LABEL[quality.quality] || quality.quality}
+            </span>
+            <button
+              type="button"
+              disabled={checking}
+              onClick={() => void onCheckNumber()}
+              className="h-9 rounded-lg border border-gray-300 px-3 text-sm font-medium disabled:opacity-50 dark:border-gray-700 dark:text-gray-200"
+            >
+              {checking ? "Checking…" : "Check with Meta"}
+            </button>
+          </div>
         </div>
+
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {quality.reported_at
+            ? `Reported ${whenLabel(quality.reported_at)}`
+            : "Meta has never reported a rating for this number"}
+          {sendLimit ? ` · you may message ${sendLimit}` : ""}
+          {". "}
+          The rating normally arrives on its own; Check with Meta asks for it now, which
+          is worth doing if this has said “Not reported yet” for a while.
+        </p>
 
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Figure label="Messages sent" value={messaging.spend.messages} />

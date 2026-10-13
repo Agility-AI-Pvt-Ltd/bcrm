@@ -5,6 +5,7 @@ import Link from "next/link";
 import { failureText } from "@/lib/api";
 import {
   askVisitFeedback,
+  assignVisit,
   cancelVisit,
   checkInVisit,
   clearVisitReview,
@@ -12,6 +13,7 @@ import {
   confirmVisit,
   formatWhen,
   getVisit,
+  getVisitTeam,
   INTEREST_LABELS,
   NEXT_STEP_LABELS,
   noShowVisit,
@@ -23,6 +25,8 @@ import {
   SOURCE_LABELS,
   TONE_CHIP,
   TONE_TEXT,
+  visitIcsPath,
+  type TeamMember,
   type Visit,
   type VisitDetail,
 } from "@/lib/siteVisits";
@@ -78,6 +82,9 @@ export default function VisitCard({
 }) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<VisitDetail | null>(null);
+  // Loaded when the card opens rather than with the list: a page of twenty
+  // cards does not need twenty copies of the team.
+  const [team, setTeam] = useState<TeamMember[]>([]);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -115,6 +122,15 @@ export default function VisitCard({
   useEffect(() => {
     if (open && !detail) void load();
   }, [open, detail, load]);
+
+  useEffect(() => {
+    if (!open || team.length) return;
+    // A failure here costs the picker, not the card: everything else about
+    // the visit still works without knowing who else is on the team.
+    getVisitTeam()
+      .then(setTeam)
+      .catch(() => setTeam([]));
+  }, [open, team.length]);
 
   useEffect(() => {
     if (!notice) return;
@@ -429,6 +445,46 @@ export default function VisitCard({
                 Cancel visit
               </button>
             ) : null}
+          </div>
+
+          {/* --- who is showing it, and getting it into their calendar --- */}
+          <div className="rounded-xl border border-gray-100 p-3 dark:border-gray-800">
+            <p className={labelText}>Who is showing it</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <select
+                aria-label="Assigned agent"
+                value={current.assigned_to ?? ""}
+                disabled={busy !== ""}
+                onChange={(event) =>
+                  void run(
+                    "assign",
+                    () => assignVisit(current.id, event.target.value || null),
+                    event.target.value ? "Assigned." : "Assignment removed.",
+                  )
+                }
+                className="h-10 rounded-lg border border-gray-300 bg-transparent px-3 text-sm dark:border-gray-700 dark:text-white/90"
+              >
+                <option value="">Nobody yet</option>
+                {team.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
+                  </option>
+                ))}
+              </select>
+              {current.scheduled_at ? (
+                <a
+                  href={visitIcsPath(current.id)}
+                  className="flex h-10 items-center rounded-lg border border-gray-300 px-3 text-sm font-medium dark:border-gray-700 dark:text-white/90"
+                >
+                  Add to calendar
+                </a>
+              ) : null}
+            </div>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {current.assigned_name
+                ? `${current.assigned_name} is showing this one.`
+                : "Nobody has claimed this visit. It still appears on everyone's calendar feed."}
+            </p>
           </div>
 
           {/* --- move it ------------------------------------------------- */}

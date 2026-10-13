@@ -4,15 +4,14 @@ import { Metadata } from "next";
 import React from "react";
 
 export const metadata: Metadata = {
-  title: "Calender | EstateAdmin",
+  title: "Visit calendar | EstateFlow",
   description:
-    "Calender | EstateAdmin",
-  // other metadata
+    "Site visits on a grid: the week at a glance, where the free slots are, and what is already booked.",
 };
 export default function page() {
   return (
     <div>
-      <PageBreadcrumb pageTitle="Calendar" />
+      <PageBreadcrumb pageTitle="Visit calendar" />
       <Calendar />
     </div>
   );

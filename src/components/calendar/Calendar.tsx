@@ -1,283 +1,355 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+
+/**
+ * The visit calendar.
+ *
+ * This page used to be the TailAdmin starter: FullCalendar with three events
+ * hard-coded in a `useEffect` — "Event Conf.", "Meeting", "Workshop" — held in
+ * React state, no API, no persistence. A broker could open its modal and "book"
+ * something that vanished on refresh, directly under a Site Visits page that
+ * was entirely real.
+ *
+ * It is now the same visits as that page, drawn on a grid. Three decisions:
+ *
+ * **It cannot invent an appointment.** The create-event modal is gone. A visit
+ * belongs to a customer, a property and a slot, and a calendar that can conjure
+ * one with none of those attached is how orphaned rows appear. Visits are booked
+ * from a conversation, a lead, or the Site Visits page.
+ *
+ * **Background shading is free capacity**, read from the same slot generator the
+ * booking engine uses. This is the thing a list cannot show and the reason to
+ * have a calendar at all: a half-empty Tuesday beside a full Saturday is a
+ * decision, and seeing it is what makes the decision happen.
+ *
+ * **Dragging reschedules, after a confirmation.** Not because dragging is risky
+ * in itself but because the existing reschedule endpoint messages the customer,
+ * and a side effect that reaches a person should never be a side effect of a
+ * mouse slip.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import {
-  EventInput,
-  DateSelectArg,
+import type {
+  DatesSetArg,
   EventClickArg,
-  EventContentArg,
+  EventDropArg,
+  EventInput,
 } from "@fullcalendar/core";
-import { useModal } from "@/hooks/useModal";
-import { Modal } from "@/components/ui/modal";
+import { failureText } from "@/lib/api";
+import {
+  getVisitSlots,
+  getVisitsInRange,
+  rescheduleVisit,
+  type Visit,
+  type VisitSlot,
+  type VisitStatus,
+} from "@/lib/siteVisits";
+import VisitCard from "@/components/site-visits/VisitCard";
+import CalendarConnectPanel from "./CalendarConnectPanel";
 
-interface CalendarEvent extends EventInput {
-  extendedProps: {
-    calendar: string;
-  };
+/** One colour per status, reusing the vocabulary the visit cards already use. */
+const TONE: Record<VisitStatus, { bg: string; border: string }> = {
+  Requested: { bg: "#f59e0b", border: "#d97706" },
+  Confirmed: { bg: "#3641f5", border: "#2a35c7" },
+  "Checked in": { bg: "#12b76a", border: "#039855" },
+  Completed: { bg: "#667085", border: "#475467" },
+  "No show": { bg: "#f04438", border: "#d92d20" },
+  Cancelled: { bg: "#98a2b3", border: "#667085" },
+};
+
+const LEGEND: VisitStatus[] = [
+  "Requested",
+  "Confirmed",
+  "Checked in",
+  "Completed",
+  "No show",
+  "Cancelled",
+];
+
+/** Slots whose start is inside the grid get a shaded block behind the events. */
+function capacityEvents(slots: VisitSlot[]): EventInput[] {
+  return slots
+    .filter((slot) => slot.free > 0)
+    .map((slot) => ({
+      id: `free-${slot.slot_id}`,
+      start: slot.start,
+      end: slot.end,
+      display: "background",
+      title: `${slot.free} free`,
+      // Deliberately pale: this is the floor of the grid, not something to read
+      // before the visits on top of it.
+      backgroundColor: "rgba(18, 183, 106, 0.10)",
+    }));
 }
 
-const Calendar: React.FC = () => {
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
-    null
-  );
-  const [eventTitle, setEventTitle] = useState("");
-  const [eventStartDate, setEventStartDate] = useState("");
-  const [eventEndDate, setEventEndDate] = useState("");
-  const [eventLevel, setEventLevel] = useState("");
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+export default function Calendar() {
   const calendarRef = useRef<FullCalendar>(null);
-  const { isOpen, openModal, closeModal } = useModal();
+  const [visits, setVisits] = useState<Visit[]>([]);
+  const [slots, setSlots] = useState<VisitSlot[]>([]);
+  // Named `range`, not `window`: a state variable called window shadows the
+  // global inside this component, and the next person to need it would not
+  // find out until runtime.
+  const [range, setRange] = useState<{ start: Date; end: Date } | null>(null);
+  const [selected, setSelected] = useState<Visit | null>(null);
+  const [pending, setPending] = useState<{ visit: Visit; slot: VisitSlot; revert: () => void } | null>(
+    null,
+  );
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [showCapacity, setShowCapacity] = useState(true);
+  const [busy, setBusy] = useState(false);
 
-  const calendarsEvents = {
-    Danger: "danger",
-    Success: "success",
-    Primary: "primary",
-    Warning: "warning",
-  };
+  const load = useCallback(async () => {
+    if (!range) return;
+    try {
+      const [inWindow, free] = await Promise.all([
+        getVisitsInRange(range.start, range.end),
+        // Slots are generated forward from now, so a past month simply has
+        // none — which is correct: there is no capacity to offer in the past.
+        getVisitSlots(500, 60).catch(() => [] as VisitSlot[]),
+      ]);
+      setVisits(inWindow.items);
+      setSlots(free);
+      setError("");
+    } catch (err) {
+      setError(failureText(err, "Could not load the visits for these dates."));
+    }
+  }, [range]);
 
   useEffect(() => {
-    // Initialize with some events
-    setEvents([
-      {
-        id: "1",
-        title: "Event Conf.",
-        start: new Date().toISOString().split("T")[0],
-        extendedProps: { calendar: "Danger" },
-      },
-      {
-        id: "2",
-        title: "Meeting",
-        start: new Date(Date.now() + 86400000).toISOString().split("T")[0],
-        extendedProps: { calendar: "Success" },
-      },
-      {
-        id: "3",
-        title: "Workshop",
-        start: new Date(Date.now() + 172800000).toISOString().split("T")[0],
-        end: new Date(Date.now() + 259200000).toISOString().split("T")[0],
-        extendedProps: { calendar: "Primary" },
-      },
-    ]);
-  }, []);
+    void load();
+  }, [load]);
 
-  const handleDateSelect = (selectInfo: DateSelectArg) => {
-    resetModalFields();
-    setEventStartDate(selectInfo.startStr);
-    setEventEndDate(selectInfo.endStr || selectInfo.startStr);
-    openModal();
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 6000);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
+  const events = useMemo<EventInput[]>(() => {
+    const booked: EventInput[] = visits
+      .filter((visit) => visit.scheduled_at)
+      .map((visit) => {
+        const tone = TONE[visit.status] || TONE.Confirmed;
+        const who = visit.customer_name || visit.customer_phone;
+        return {
+          id: visit.id,
+          title: visit.property_title ? `${who} · ${visit.property_title}` : who,
+          start: visit.scheduled_at as string,
+          end: visit.slot_end || undefined,
+          backgroundColor: tone.bg,
+          borderColor: tone.border,
+          // A cancelled visit is drawn, because a broker looking at the week
+          // needs to know the slot is free again — but faded, so it does not
+          // read as something to turn up to.
+          classNames: visit.status === "Cancelled" ? ["opacity-50", "line-through"] : [],
+          // Only a visit that has not happened yet can be dragged somewhere else.
+          editable: visit.status === "Requested" || visit.status === "Confirmed",
+          extendedProps: { visit },
+        };
+      });
+    return showCapacity ? [...capacityEvents(slots), ...booked] : booked;
+  }, [visits, slots, showCapacity]);
+
+  const onEventClick = (info: EventClickArg) => {
+    const visit = info.event.extendedProps?.visit as Visit | undefined;
+    if (visit) setSelected(visit);
   };
 
-  const handleEventClick = (clickInfo: EventClickArg) => {
-    const event = clickInfo.event;
-    setSelectedEvent(event as unknown as CalendarEvent);
-    setEventTitle(event.title);
-    setEventStartDate(event.start?.toISOString().split("T")[0] || "");
-    setEventEndDate(event.end?.toISOString().split("T")[0] || "");
-    setEventLevel(event.extendedProps.calendar);
-    openModal();
-  };
-
-  const handleAddOrUpdateEvent = () => {
-    if (selectedEvent) {
-      // Update existing event
-      setEvents((prevEvents) =>
-        prevEvents.map((event) =>
-          event.id === selectedEvent.id
-            ? {
-                ...event,
-                title: eventTitle,
-                start: eventStartDate,
-                end: eventEndDate,
-                extendedProps: { calendar: eventLevel },
-              }
-            : event
-        )
-      );
-    } else {
-      // Add new event
-      const newEvent: CalendarEvent = {
-        id: Date.now().toString(),
-        title: eventTitle,
-        start: eventStartDate,
-        end: eventEndDate,
-        allDay: true,
-        extendedProps: { calendar: eventLevel },
-      };
-      setEvents((prevEvents) => [...prevEvents, newEvent]);
+  /**
+   * A drop asks rather than acts.
+   *
+   * The visit is matched to a generated slot id, because the booking engine only
+   * accepts slots from its own grid — dropping something at 3:17pm is not a
+   * reschedule, it is a miss, and saying so beats inventing a slot that the
+   * rules do not allow.
+   */
+  const onEventDrop = (info: EventDropArg) => {
+    const visit = info.event.extendedProps?.visit as Visit | undefined;
+    const start = info.event.start;
+    if (!visit || !start) {
+      info.revert();
+      return;
     }
-    closeModal();
-    resetModalFields();
+    const target = slots.find(
+      (slot) => Math.abs(new Date(slot.start).getTime() - start.getTime()) < 60_000,
+    );
+    if (!target) {
+      info.revert();
+      setError(
+        "That is not one of your bookable slots. Drop it on a shaded slot, or widen your visiting hours in Site Visits settings.",
+      );
+      return;
+    }
+    setError("");
+    setPending({ visit, slot: target, revert: info.revert });
   };
 
-  const resetModalFields = () => {
-    setEventTitle("");
-    setEventStartDate("");
-    setEventEndDate("");
-    setEventLevel("");
-    setSelectedEvent(null);
+  const confirmMove = async () => {
+    if (!pending) return;
+    setBusy(true);
+    try {
+      await rescheduleVisit(pending.visit.id, pending.slot.slot_id);
+      setNotice(
+        `Moved to ${pending.slot.label}. ${
+          pending.visit.customer_name || "The customer"
+        } has been told on WhatsApp.`,
+      );
+      setPending(null);
+      await load();
+    } catch (err) {
+      pending.revert();
+      setError(failureText(err, "Could not move that visit."));
+      setPending(null);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelMove = () => {
+    pending?.revert();
+    setPending(null);
   };
 
   return (
-    <div className="rounded-2xl border  border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="custom-calendar">
-        <FullCalendar
-          ref={calendarRef}
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
-          headerToolbar={{
-            left: "prev,next addEventButton",
-            center: "title",
-            right: "dayGridMonth,timeGridWeek,timeGridDay",
-          }}
-          events={events}
-          selectable={true}
-          select={handleDateSelect}
-          eventClick={handleEventClick}
-          eventContent={renderEventContent}
-          customButtons={{
-            addEventButton: {
-              text: "Add Event +",
-              click: openModal,
-            },
-          }}
-        />
+    <div className="space-y-5">
+      <CalendarConnectPanel onNotice={setNotice} />
+
+      {notice ? (
+        <div className="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-500">
+          {notice}
+        </div>
+      ) : null}
+      {error ? (
+        <div className="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-500">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+          <div className="flex flex-wrap items-center gap-3">
+            {LEGEND.map((status) => (
+              <span key={status} className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: TONE[status].bg }}
+                />
+                {status}
+              </span>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={showCapacity}
+              onChange={(event) => setShowCapacity(event.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 dark:border-gray-700"
+            />
+            Shade free slots
+          </label>
+        </div>
+
+        <div className="visit-calendar p-2 sm:p-4">
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            initialView="timeGridWeek"
+            headerToolbar={{
+              left: "prev,next today",
+              center: "title",
+              right: "dayGridMonth,timeGridWeek,timeGridDay",
+            }}
+            buttonText={{ today: "Today", month: "Month", week: "Week", day: "Day" }}
+            events={events}
+            eventClick={onEventClick}
+            eventDrop={onEventDrop}
+            editable
+            // Resizing would change a visit's duration, which the slot grid owns
+            // — a visit is one slot long by the agency's own rules.
+            eventResizableFromStart={false}
+            eventDurationEditable={false}
+            selectable={false}
+            nowIndicator
+            height="auto"
+            slotMinTime="07:00:00"
+            slotMaxTime="22:00:00"
+            firstDay={1}
+            datesSet={(arg: DatesSetArg) => setRange({ start: arg.start, end: arg.end })}
+            eventTimeFormat={{ hour: "numeric", minute: "2-digit", meridiem: "short" }}
+          />
+        </div>
       </div>
-      <Modal
-        isOpen={isOpen}
-        onClose={closeModal}
-        className="max-w-[700px] p-6 lg:p-10"
-      >
-        <div className="flex flex-col px-2 overflow-y-auto custom-scrollbar">
-          <div>
-            <h5 className="mb-2 font-semibold text-gray-800 modal-title text-theme-xl dark:text-white/90 lg:text-2xl">
-              {selectedEvent ? "Edit Event" : "Add Event"}
-            </h5>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Plan your next big moment: schedule or edit an event to stay on
-              track
-            </p>
-          </div>
-          <div className="mt-8">
-            <div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                  Event Title
-                </label>
-                <input
-                  id="event-title"
-                  type="text"
-                  value={eventTitle}
-                  onChange={(e) => setEventTitle(e.target.value)}
-                  className="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                />
-              </div>
-            </div>
-            <div className="mt-6">
-              <label className="block mb-4 text-sm font-medium text-gray-700 dark:text-gray-400">
-                Event Color
-              </label>
-              <div className="flex flex-wrap items-center gap-4 sm:gap-5">
-                {Object.entries(calendarsEvents).map(([key, value]) => (
-                  <div key={key} className="n-chk">
-                    <div
-                      className={`form-check form-check-${value} form-check-inline`}
-                    >
-                      <label
-                        className="flex items-center text-sm text-gray-700 form-check-label dark:text-gray-400"
-                        htmlFor={`modal${key}`}
-                      >
-                        <span className="relative">
-                          <input
-                            className="sr-only form-check-input"
-                            type="radio"
-                            name="event-level"
-                            value={key}
-                            id={`modal${key}`}
-                            checked={eventLevel === key}
-                            onChange={() => setEventLevel(key)}
-                          />
-                          <span className="flex items-center justify-center w-5 h-5 mr-2 border border-gray-300 rounded-full box dark:border-gray-700">
-                            <span
-                              className={`h-2 w-2 rounded-full bg-white ${
-                                eventLevel === key ? "block" : "hidden"
-                              }`}  
-                            ></span>
-                          </span>
-                        </span>
-                        {key}
-                      </label>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            <div className="mt-6">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                Enter Start Date
-              </label>
-              <div className="relative">
-                <input
-                  id="event-start-date"
-                  type="date"
-                  value={eventStartDate}
-                  onChange={(e) => setEventStartDate(e.target.value)}
-                  className="dark:bg-dark-900 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pl-4 pr-11 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                />
-              </div>
-            </div>
+      {visits.length === 0 && !error ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          No visits in this window. They are booked from a WhatsApp conversation, from an
+          AI call, or by hand on the Site Visits page.
+        </p>
+      ) : null}
 
-            <div className="mt-6">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-                Enter End Date
-              </label>
-              <div className="relative">
-                <input
-                  id="event-end-date"
-                  type="date"
-                  value={eventEndDate}
-                  onChange={(e) => setEventEndDate(e.target.value)}
-                  className="dark:bg-dark-900 h-11 w-full appearance-none rounded-lg border border-gray-300 bg-transparent bg-none px-4 py-2.5 pl-4 pr-11 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30 dark:focus:border-brand-800"
-                />
-              </div>
+      {selected ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
+          <div className="mt-10 w-full max-w-2xl">
+            <div className="mb-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-gray-700 dark:bg-gray-900 dark:text-gray-200"
+              >
+                Close
+              </button>
             </div>
-          </div>
-          <div className="flex items-center gap-3 mt-6 modal-footer sm:justify-end">
-            <button
-              onClick={closeModal}
-              type="button"
-              className="flex w-full justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.03] sm:w-auto"
-            >
-              Close
-            </button>
-            <button
-              onClick={handleAddOrUpdateEvent}
-              type="button"
-              className="btn btn-success btn-update-event flex w-full justify-center rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 sm:w-auto"
-            >
-              {selectedEvent ? "Update Changes" : "Add Event"}
-            </button>
+            {/* The same card the Site Visits page uses, so there is one place a
+                visit is read and acted on. */}
+            <VisitCard
+              visit={selected}
+              onChanged={(next) => {
+                setSelected(next ?? null);
+                void load();
+              }}
+            />
           </div>
         </div>
-      </Modal>
+      ) : null}
+
+      {pending ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 dark:bg-gray-900">
+            <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+              Move this visit?
+            </h3>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              {pending.visit.customer_name || pending.visit.customer_phone} moves to{" "}
+              <span className="font-medium text-gray-800 dark:text-white/90">
+                {pending.slot.label}
+              </span>
+              . They will be told on WhatsApp straight away, so this is not a silent
+              change.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelMove}
+                className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-medium dark:border-gray-700 dark:text-white/90"
+              >
+                Keep it where it was
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void confirmMove()}
+                className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {busy ? "Moving…" : "Move and tell them"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
-};
-
-const renderEventContent = (eventInfo: EventContentArg) => {
-  const colorClass = `fc-bg-${eventInfo.event.extendedProps.calendar.toLowerCase()}`;
-  return (
-    <div
-      className={`event-fc-color flex fc-event-main ${colorClass} p-1 rounded-sm`}
-    >
-      <div className="fc-daygrid-event-dot"></div>
-      <div className="fc-event-time">{eventInfo.timeText}</div>
-      <div className="fc-event-title">{eventInfo.event.title}</div>
-    </div>
-  );
-};
-
-export default Calendar;
+}

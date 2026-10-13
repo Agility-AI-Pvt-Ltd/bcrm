@@ -27,6 +27,9 @@ const EMPTY: Record<VisitScope, string> = {
   needs_attention: "Nothing waiting — every visit has a slot, a pin and an outcome.",
   past: "No past visits yet.",
   all: "No visits yet.",
+  // Never shown: `range` is what the calendar asks for, and an empty window
+  // there is a quiet grid rather than a sentence.
+  range: "No visits in this window.",
 };
 
 const input =
