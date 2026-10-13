@@ -108,6 +108,11 @@ export type Visit = {
   feedback_summary: string | null;
   feedback_source: string | null;
 
+  assigned_to: string | null;
+  /** The agent's name, resolved server-side. Null when nobody has claimed it —
+   *  a state the calendar shows rather than an error. */
+  assigned_name: string | null;
+
   needs_review: boolean;
   review_reason: string | null;
   created_at: string;
@@ -150,7 +155,35 @@ export type VisitSettingsUpdate = Partial<
   Omit<VisitSettings, "warnings" | "reminder_template_status" | "feedback_template_status">
 >;
 
-export type VisitScope = "today" | "upcoming" | "needs_attention" | "past" | "all";
+export type VisitScope =
+  | "today"
+  | "upcoming"
+  | "needs_attention"
+  | "past"
+  | "all"
+  | "range";
+
+/** One person's Google Calendar connection. */
+export type CalendarStatus = {
+  /** False when this deployment has no Google OAuth client: the section hides
+   *  rather than offering a button that cannot work. */
+  available: boolean;
+  /** connected | disconnected | revoked — revoked needs them to grant again. */
+  status: string;
+  account_email: string | null;
+  push_events: boolean;
+  block_slots: boolean;
+  last_synced_at: string | null;
+  last_error: string | null;
+  authorize_url: string | null;
+};
+
+export type CalendarFeed = {
+  /** A path, not a URL: the API does not reliably know its own public origin,
+   *  and a feed URL with the wrong host in it is worse than none. */
+  path: string;
+  token: string | null;
+};
 
 export type SendOutcome = { sent: boolean; reason: string; message_id: string | null };
 
@@ -159,10 +192,63 @@ const BASE = "/api/v1/visits";
 export const getVisits = (scope: VisitScope = "upcoming", limit = 50) =>
   apiFetch<VisitList>(`${BASE}?scope=${scope}&limit=${limit}`);
 
+/**
+ * Everything in a window, for the calendar.
+ *
+ * Absolute rather than relative to now: a broker scrolling back to last month
+ * wants what happened, so cancellations and no-shows come too and the grid
+ * colours them.
+ */
+export const getVisitsInRange = (from: Date, to: Date, assignedTo?: string) => {
+  const params = new URLSearchParams({
+    scope: "range",
+    start: from.toISOString(),
+    end: to.toISOString(),
+    limit: "200",
+  });
+  if (assignedTo) params.set("assigned_to", assignedTo);
+  return apiFetch<VisitList>(`${BASE}?${params.toString()}`);
+};
+
+/** Somebody a visit can be assigned to. Names only — not a team directory. */
+export type TeamMember = { id: string; name: string };
+
+export const getVisitTeam = () => apiFetch<TeamMember[]>(`${BASE}/team`);
+
+export const assignVisit = (id: string, assignedTo: string | null) =>
+  apiFetch<VisitDetail>(`${BASE}/${id}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ assigned_to: assignedTo }),
+  });
+
+/** The staff version of one visit, with the customer on it. */
+export const visitIcsPath = (id: string) => `${BASE}/${id}/calendar.ics`;
+
+export const getCalendarFeed = () => apiFetch<CalendarFeed>(`${BASE}/calendar/feed`);
+
+export const rotateCalendarFeed = () =>
+  apiFetch<CalendarFeed>(`${BASE}/calendar/feed/rotate`, { method: "POST" });
+
+export const getCalendarStatus = () => apiFetch<CalendarStatus>(`${BASE}/calendar/google`);
+
+export const saveCalendarSettings = (payload: {
+  push_events?: boolean;
+  block_slots?: boolean;
+}) =>
+  apiFetch<CalendarStatus>(`${BASE}/calendar/google/settings`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const disconnectCalendar = () =>
+  apiFetch<CalendarStatus>(`${BASE}/calendar/google/disconnect`, { method: "POST" });
+
 export const getVisit = (id: string) => apiFetch<VisitDetail>(`${BASE}/${id}`);
 
-export const getVisitSlots = (limit = 40) =>
-  apiFetch<VisitSlot[]>(`${BASE}/slots?limit=${limit}`);
+export const getVisitSlots = (limit = 40, days?: number) =>
+  apiFetch<VisitSlot[]>(
+    `${BASE}/slots?limit=${limit}${days ? `&days=${days}` : ""}`,
+  );
 
 export const getVisitSettings = () => apiFetch<VisitSettings>(`${BASE}/settings`);
 

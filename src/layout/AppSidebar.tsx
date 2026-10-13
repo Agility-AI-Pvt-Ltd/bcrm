@@ -78,7 +78,8 @@ const navItems: NavItem[] = [
   },
   // Site visits are the one thing in this product that happens in the physical
   // world, and the day a broker has is organised around them — so they sit above
-  // the calendar rather than inside it.
+  // the calendar rather than inside it. The two are views of the same visits:
+  // the list for working through them, the grid for seeing the week.
   {
     icon: <MapPinIcon />,
     name: "Site Visits",
@@ -86,7 +87,7 @@ const navItems: NavItem[] = [
   },
   {
     icon: <CalenderIcon />,
-    name: "Calendar",
+    name: "Visit calendar",
     path: "/calendar",
   },
   // Not a campaign step either: a lead can go quiet weeks after the campaign

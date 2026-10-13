@@ -137,9 +137,26 @@ export default function LandingPage() {
           </section>
         </main>
 
+        {/* Privacy and Terms are linked from here on purpose. Google's OAuth
+            review looks for them to be reachable from the homepage, and a policy
+            page nobody can find from the front door is a policy page nobody
+            reads. */}
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 py-6 text-xs text-gray-400 dark:border-gray-800 dark:text-gray-500">
-          <span>© {new Date().getFullYear()} EstateFlow</span>
-          <span>AI-assisted real-estate campaign workspace</span>
+          <span>© {new Date().getFullYear()} Agility AI · EstateFlow</span>
+          <nav className="flex items-center gap-4">
+            <Link
+              href="/privacy"
+              className="transition hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/terms"
+              className="transition hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              Terms
+            </Link>
+          </nav>
         </footer>
       </div>
     </div>
