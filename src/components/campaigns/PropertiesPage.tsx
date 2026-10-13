@@ -18,6 +18,7 @@ import {
 import PropertyImportPanel from "@/components/campaigns/PropertyImportPanel";
 import PropertySheetsPanel from "@/components/campaigns/PropertySheetsPanel";
 import TrustSettingsCard from "@/components/properties/TrustSettingsCard";
+import PropertyIntakePanel from "@/components/properties/PropertyIntakePanel";
 
 const PAGE_SIZE = 50;
 
@@ -104,6 +105,8 @@ export default function PropertiesPage() {
       </div>
 
       <TrustSettingsCard />
+
+      <PropertyIntakePanel />
 
       <PropertySheetsPanel onSynced={load} />
 
