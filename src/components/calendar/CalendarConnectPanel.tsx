@@ -21,7 +21,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { failureText } from "@/lib/api";
+import { API_BASE_URL, failureText } from "@/lib/api";
 import {
   disconnectCalendar,
   getCalendarFeed,
@@ -62,7 +62,9 @@ export default function CalendarConnectPanel({
     void load();
   }, [load]);
 
-  const subscribeUrl = feed ? `${window.location.origin}${feed.path}` : "";
+  // The .ics file is served by the API, not this Next app. Using the page
+  // origin produced a Vercel URL that 404s when a phone tries to subscribe.
+  const subscribeUrl = feed ? `${API_BASE_URL}${feed.path}` : "";
 
   const reveal = async () => {
     setBusy(true);
