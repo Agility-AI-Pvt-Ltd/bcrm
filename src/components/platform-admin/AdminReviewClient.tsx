@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ApiError, failureText } from "@/lib/api";
 import {
@@ -154,13 +155,21 @@ export default function AdminReviewClient() {
           <p className="text-sm font-medium text-gray-800 dark:text-white/90">
             {admin?.name || admin?.email}
           </p>
-          <button
-            type="button"
-            onClick={signOut}
-            className="mt-1 text-xs text-gray-500 underline hover:text-gray-700 dark:text-gray-400"
-          >
-            Sign out
-          </button>
+          <div className="mt-1 flex items-center justify-end gap-3">
+            <Link
+              href="/admin/spend"
+              className="text-xs text-brand-500 underline hover:text-brand-600"
+            >
+              Account spend
+            </Link>
+            <button
+              type="button"
+              onClick={signOut}
+              className="text-xs text-gray-500 underline hover:text-gray-700 dark:text-gray-400"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </header>
 

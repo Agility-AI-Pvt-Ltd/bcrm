@@ -50,6 +50,19 @@ export type RegistrationList = {
   counts: Record<string, number>;
 };
 
+export type RegistrationFilters = {
+  status?: string;
+  mine?: boolean;
+  search?: string;
+  project?: string;
+  developer?: string;
+  registered_from?: string;
+  registered_to?: string;
+  sort?: "registered_at_desc" | "registered_at_asc" | "valid_until_asc" | "valid_until_desc" | "status_asc" | "status_desc";
+  limit?: number;
+  offset?: number;
+};
+
 export type ChainReport = {
   checked: number;
   intact: boolean;
@@ -122,15 +135,16 @@ export const registerLead = (body: RegisterLeadBody) =>
     body: JSON.stringify(body),
   });
 
-export const listRegistrations = (params: {
-  status?: string;
-  mine?: boolean;
-  limit?: number;
-  offset?: number;
-} = {}) => {
+export const listRegistrations = (params: RegistrationFilters = {}) => {
   const query = new URLSearchParams();
   if (params.status) query.set("status", params.status);
   if (params.mine) query.set("mine", "true");
+  if (params.search) query.set("search", params.search);
+  if (params.project) query.set("project", params.project);
+  if (params.developer) query.set("developer", params.developer);
+  if (params.registered_from) query.set("registered_from", params.registered_from);
+  if (params.registered_to) query.set("registered_to", params.registered_to);
+  if (params.sort) query.set("sort", params.sort);
   query.set("limit", String(params.limit ?? 50));
   query.set("offset", String(params.offset ?? 0));
   return apiFetch<RegistrationList>(`${BASE}/registrations?${query}`);

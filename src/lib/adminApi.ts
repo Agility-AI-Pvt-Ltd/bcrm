@@ -193,3 +193,118 @@ export async function decideAccount(
     body: JSON.stringify({ note: note?.trim() || null }),
   });
 }
+
+// --- what each account costs us to serve ------------------------------------
+
+export type SpendLine = {
+  kind: string;
+  label: string;
+  unit: string;
+  unit_label: string;
+  /** Decimal as a string. Parsing it to a float loses the last places of a
+   *  per-token rate, and these numbers get compared against provider invoices. */
+  quantity: string;
+  amount: string;
+  unpriced_quantity: string;
+  events: number;
+};
+
+export type SpendEntry = {
+  kind: string;
+  key: string;
+  unit: string;
+  quantity: string;
+  unit_rate: string | null;
+  amount: string | null;
+  occurred_at: string | null;
+  source: string | null;
+  reference_id: string | null;
+  detail: Record<string, unknown>;
+};
+
+export type AccountSpend = {
+  organization_id: string;
+  organization_name: string | null;
+  period_start: string;
+  period_end: string;
+  currency: string;
+  total: string;
+  lines: SpendLine[];
+  customers: number;
+  new_customers: number;
+  cost_per_customer: string | null;
+  /** Some usage happened that nobody had priced. The screens say so next to the
+   *  total, so a small number is not read as a small bill. */
+  has_unpriced: boolean;
+};
+
+export type AccountSpendDetail = AccountSpend & { entries: SpendEntry[] };
+
+export type UsageRate = {
+  id: string | null;
+  kind: string;
+  key: string;
+  unit: string;
+  unit_label: string;
+  /** The group this sits under on the rate screen. */
+  kind_label: string;
+  /** Where to find this figure on the provider's invoice. */
+  help: string | null;
+  amount: string | null;
+  currency: string;
+  effective_from: string | null;
+  note: string | null;
+  /** False for a unit we know how to meter and nobody has priced yet. */
+  configured: boolean;
+};
+
+export async function listAccountSpend(days = 30): Promise<AccountSpend[]> {
+  return adminFetch<AccountSpend[]>(`/api/v1/admin/spend?days=${days}`);
+}
+
+export async function getAccountSpend(
+  organizationId: string,
+  days = 30,
+): Promise<AccountSpendDetail> {
+  return adminFetch<AccountSpendDetail>(
+    `/api/v1/admin/spend/${organizationId}?days=${days}&limit=200`,
+  );
+}
+
+export async function listUsageRates(): Promise<UsageRate[]> {
+  return adminFetch<UsageRate[]>("/api/v1/admin/rates");
+}
+
+export async function setUsageRate(input: {
+  kind: string;
+  key: string;
+  unit: string;
+  amount: string | null;
+  effective_from?: string;
+  note?: string;
+}): Promise<UsageRate> {
+  return adminFetch<UsageRate>("/api/v1/admin/rates", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Rupees, from a decimal string. Returns a dash for an unpriced value, never ₹0 —
+ *  showing zero would claim we know it was free. */
+export function rupees(value: string | null | undefined, places = 2): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "—";
+  return `₹${amount.toLocaleString("en-IN", {
+    minimumFractionDigits: places,
+    maximumFractionDigits: places,
+  })}`;
+}
+
+/** A quantity, trimmed of the trailing zeros a six-place decimal carries. */
+export function quantity(value: string | null | undefined): string {
+  if (!value) return "0";
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return String(value);
+  return amount.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
