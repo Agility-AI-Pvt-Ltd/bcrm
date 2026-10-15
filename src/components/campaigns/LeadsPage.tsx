@@ -21,13 +21,23 @@
  * dropping the unreplied rows would have hidden exactly the people the follow-up
  * shift is working on. /contacts remains the full book of business.
  *
+ * Day / week / month is the other control, and it moves the whole page: the
+ * tiles and the table are two queries over one window, so they are given the
+ * same period or the headline counts everyone while the list shows today.
+ * Calendar periods in the agency's own timezone, matched on last activity — an
+ * agent asking what the week looks like means the week they are standing in.
+ * It opens on all time, so nothing an agent relied on seeing disappeared behind
+ * a button nobody told them about.
+ *
  * One thing on this page is not a filter but a work queue: when the AI offers a
  * callback and the customer says yes, the backend writes a `callback_requests`
  * row and stamps `callback_requested_at` on the contact. Those leads are sorted
  * above everyone else (oldest wait first, decided server-side), carry an amber
  * marker, and stay there until a human presses "Mark called". Nothing clears them
  * automatically — the flag stands for a promise made to a person, so only a
- * person can say it was kept.
+ * person can say it was kept. That queue is also the one thing the period does
+ * not touch: somebody still owed a call stays listed whatever window is chosen,
+ * because an older unreturned call is more urgent, not less.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -37,6 +47,7 @@ import { ApiError } from "@/lib/api";
 import {
   CUSTOMER_STAGES,
   ENGAGEMENT_TIERS,
+  LEAD_PERIODS,
   formatSince,
   formatWhen,
   getPipeline,
@@ -46,6 +57,7 @@ import {
   tierBadgeColor,
   type Lead,
   type LeadPage as LeadPageData,
+  type LeadPeriod,
   type PipelineSnapshot,
 } from "@/lib/outreach";
 
@@ -86,6 +98,7 @@ export default function LeadsPage() {
   const [snapshot, setSnapshot] = useState<PipelineSnapshot | null>(null);
   const [page, setPage] = useState<LeadPageData | null>(null);
   const [scope, setScope] = useState<LeadScope>("replied");
+  const [period, setPeriod] = useState<LeadPeriod>("all");
   const [stage, setStage] = useState("");
   const [tier, setTier] = useState("");
   const [awaitingOnly, setAwaitingOnly] = useState(false);
@@ -113,13 +126,13 @@ export default function LeadsPage() {
 
   const loadSnapshot = useCallback(async () => {
     try {
-      setSnapshot(await getPipeline());
+      setSnapshot(await getPipeline(period));
     } catch (error) {
       setNotice(
         error instanceof ApiError ? error.message : "Could not read the lead totals.",
       );
     }
-  }, []);
+  }, [period]);
 
   const loadLeads = useCallback(async () => {
     setLoading(true);
@@ -132,6 +145,7 @@ export default function LeadsPage() {
           tier: tier || undefined,
           awaitingCallback: awaitingOnly || undefined,
           search: search || undefined,
+          period,
           limit: PAGE_SIZE,
           offset,
         }),
@@ -141,7 +155,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [scope, stage, tier, awaitingOnly, search, offset]);
+  }, [scope, stage, tier, awaitingOnly, search, period, offset]);
 
   useEffect(() => {
     void loadSnapshot();
@@ -204,6 +218,16 @@ export default function LeadsPage() {
 
   const tierHints = TIER_HINTS[scope];
 
+  // The server words the period, so "This week" is defined in one place rather
+  // than in both codebases. The local list is the fallback before the first
+  // snapshot lands.
+  const periodLabel =
+    snapshot?.period === period
+      ? (snapshot?.period_label ??
+        LEAD_PERIODS.find((option) => option.value === period)?.label ??
+        "")
+      : (LEAD_PERIODS.find((option) => option.value === period)?.label ?? "");
+
   /**
    * Switching scope narrows or widens who is listed, so a stage filter that only
    * exists in the wider scope has to go — leaving `stage="New"` set while
@@ -251,6 +275,13 @@ export default function LeadsPage() {
     ];
   }, [snapshot]);
 
+  /** A new window starts at the first page: page 3 of the month is not page 3
+   *  of today, and leaving the offset would land on an empty list. */
+  const changePeriod = (next: LeadPeriod) => {
+    setPeriod(next);
+    setOffset(0);
+  };
+
   const setFilter = (nextStage: string, nextTier: string) => {
     setStage(nextStage);
     setTier(nextTier);
@@ -278,8 +309,41 @@ export default function LeadsPage() {
               ? "A real person replying on WhatsApp — even once — makes them a lead, and they are listed here separately from the rest of your contacts."
               : "Every contact across the six stages, including those who have not replied yet. The AI keeps following these up."}
           </p>
+          {period !== "all" ? (
+            // Said out loud, because every number below it changed when the
+            // button was pressed and a count with no stated window is a count
+            // somebody will read as the whole book of business.
+            <p className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              {periodLabel} — counting everyone who last replied in this period.
+              Customers still waiting for a call are always shown.
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* The working window. First, because it is the control an agent
+              reaches for every morning — and it moves the tiles as well as the
+              list, so it belongs above both rather than inside the table. */}
+          <div
+            role="group"
+            aria-label="Which period to show"
+            className="flex rounded-lg border border-gray-300 p-0.5 dark:border-gray-700"
+          >
+            {LEAD_PERIODS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => changePeriod(option.value)}
+                aria-pressed={period === option.value}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  period === option.value
+                    ? "bg-gray-900 text-white dark:bg-white dark:text-gray-900"
+                    : "text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
           {/* The old /pipeline board, folded in as a scope rather than a page. */}
           <div
             role="group"
@@ -343,7 +407,10 @@ export default function LeadsPage() {
             {awaitingOnly
               ? "Showing only these — click to show every lead"
               : waiting > 0
-                ? "Agreed to a callback. Click to show only these"
+                ? period === "all"
+                  ? "Agreed to a callback. Click to show only these"
+                  : // The one number on this row the period does not touch.
+                    "Agreed to a callback — every period, not just this one"
                 : "Nobody is waiting to be phoned"}
           </p>
         </button>

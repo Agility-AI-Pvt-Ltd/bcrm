@@ -15,7 +15,18 @@ type Props = {
   onSent?: () => void;
 };
 
-const LINES: Array<{ key: keyof DigestPreview["counts"]; label: string }> = [
+/** The numeric lines only — `counts.visits` is a list, shown under them. */
+type CountKey =
+  | "new_leads"
+  | "hot"
+  | "warm"
+  | "cold"
+  | "followups_due"
+  | "not_contacted"
+  | "visits_today"
+  | "unanswered";
+
+const LINES: Array<{ key: CountKey; label: string }> = [
   { key: "new_leads", label: "New leads" },
   { key: "hot", label: "🔥 Hot" },
   { key: "warm", label: "🟡 Warm" },
@@ -131,6 +142,30 @@ export default function DigestPreviewCard({ refreshKey = 0, onSent }: Props) {
               Hot, Warm and Cold add up to the new-lead count. A lead the scorer has not read
               yet counts as Cold rather than disappearing.
             </p>
+
+            {preview.counts.visits?.length ? (
+              <div className="mt-5">
+                <h4 className="text-sm font-medium text-gray-800 dark:text-white/90">
+                  Today&rsquo;s site visits
+                </h4>
+                <ul className="mt-2 space-y-1.5">
+                  {preview.counts.visits.map((visit, index) => (
+                    <li
+                      key={`${visit.time_label}-${index}`}
+                      className="flex flex-wrap items-baseline gap-x-2 text-sm text-gray-700 dark:text-gray-300"
+                    >
+                      <span className="font-medium text-gray-900 dark:text-white/90">
+                        {visit.time_label}
+                      </span>
+                      <span>{visit.customer}</span>
+                      {visit.property_label ? (
+                        <span className="text-xs text-gray-500">· {visit.property_label}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
 
             <h4 className="mt-5 text-sm font-medium text-gray-800 dark:text-white/90">
               Going to {preview.recipients.length}{" "}

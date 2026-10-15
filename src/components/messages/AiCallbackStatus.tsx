@@ -112,6 +112,8 @@ export function AiCallbackStrip({ view }: { view: AiCallbackView }) {
     "scheduled",
     "checking",
     "awaiting_consent",
+    "awaiting_time",
+    "call_booked",
     "dialing",
     "ringing",
     "on_call",

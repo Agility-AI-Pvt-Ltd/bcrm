@@ -8,7 +8,12 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { failureText } from "@/lib/api";
-import { getAiCall, placeTestCall, type AiCallDetail } from "@/lib/aiCallback";
+import {
+  getAiCall,
+  getAiCallback,
+  placeTestCall,
+  type AiCallDetail,
+} from "@/lib/aiCallback";
 import { AI_CALLBACK_LIVE_PHASES } from "@/lib/inbox";
 import { AiCallbackStrip } from "@/components/messages/AiCallbackStatus";
 import AiCallDetails from "@/components/ai-callback/AiCallDetails";
@@ -20,6 +25,26 @@ export default function AiTestCall() {
   const [call, setCall] = useState<AiCallDetail | null>(null);
   const [error, setError] = useState("");
   const [placing, setPlacing] = useState(false);
+  // A test call is a real call, so it is behind the same permission as the
+  // feature itself. Read here rather than passed down, because every component
+  // on this page loads its own state; the API refuses the call either way.
+  const [notAllowed, setNotAllowed] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const settings = await getAiCallback();
+        setNotAllowed(
+          settings.admin_allowed
+            ? null
+            : settings.not_allowed_reason ||
+                "AI calling is not enabled for your account. Contact BCRM support to have it switched on.",
+        );
+      } catch {
+        // Leave the button alone; the call itself will say what went wrong.
+      }
+    })();
+  }, []);
 
   const refresh = useCallback(async (callId: string) => {
     try {
@@ -67,17 +92,20 @@ export default function AiTestCall() {
           value={phone}
           onChange={(event) => setPhone(event.target.value)}
           placeholder="Your phone (blank = your profile number)"
-          className="h-11 w-full max-w-xs rounded-lg border border-gray-300 bg-transparent px-4 text-sm dark:border-gray-700 dark:text-white/90"
+          disabled={!!notAllowed}
+          className="h-11 w-full max-w-xs rounded-lg border border-gray-300 bg-transparent px-4 text-sm disabled:opacity-60 dark:border-gray-700 dark:text-white/90"
         />
         <button
           type="submit"
-          disabled={placing || live}
-          className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+          disabled={placing || live || !!notAllowed}
+          title={notAllowed || undefined}
+          className="rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {placing ? "Placing…" : live ? "Calling…" : "Call me now"}
         </button>
       </form>
 
+      {notAllowed ? <p className="mt-3 text-sm text-gray-500">{notAllowed}</p> : null}
       {error ? <p className="mt-3 text-sm text-error-500">{error}</p> : null}
 
       {call ? (

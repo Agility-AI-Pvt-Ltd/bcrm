@@ -7,10 +7,12 @@ import { ApiError, failureText } from "@/lib/api";
 import {
   clearAdminSession,
   decideAccount,
+  FEATURE_AI_CALLBACK,
   fetchQueueCounts,
   getAdminToken,
   getStoredAdmin,
   listAccounts,
+  setAccountFeature,
   type AccountFilter,
   type AccountReview,
   type QueueCounts,
@@ -112,6 +114,37 @@ export default function AdminReviewClient() {
   useEffect(() => {
     if (ready) void load();
   }, [ready, load]);
+
+  // Allowing AI calling is not a billing decision, so it is deliberately not
+  // folded into `decide`. It is organisation-wide and takes effect at once:
+  // switching it off stops enquiries already waiting on a timer, because the
+  // dialling path re-reads the grant before it dials. The agency's own on/off
+  // switch is untouched either way, so allowing them again restores what they
+  // had rather than leaving it silently off.
+  const allowAiCallback = async (row: AccountReview, allowed: boolean) => {
+    const key = `${row.user_id}:ai_callback`;
+    setBusy(key);
+    setError("");
+    try {
+      await setAccountFeature(
+        row.user_id,
+        FEATURE_AI_CALLBACK,
+        allowed,
+        notes[row.user_id],
+      );
+      setRows((current) =>
+        current.map((item) =>
+          item.user_id === row.user_id
+            ? { ...item, ai_callback_allowed: allowed }
+            : item,
+        ),
+      );
+    } catch (err) {
+      setError(failureText(err, "Could not change AI calling for this account."));
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const decide = async (
     userId: string,
@@ -305,6 +338,36 @@ export default function AdminReviewClient() {
                   </div>
                 </dl>
               ) : null}
+
+              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                    AI calling
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {row.ai_callback_allowed
+                      ? "Allowed. This agency can switch the AI callback on for themselves."
+                      : "Not allowed. The AI callback switch stays off on their side and no calls are placed."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={row.ai_callback_allowed}
+                  aria-label={`Allow AI calling for ${row.full_name}`}
+                  disabled={busy !== null}
+                  onClick={() => void allowAiCallback(row, !row.ai_callback_allowed)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:opacity-50 ${
+                    row.ai_callback_allowed ? "bg-brand-500" : "bg-gray-300 dark:bg-gray-700"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
+                      row.ai_callback_allowed ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
 
               {row.reviewed_at ? (
                 <p className="mt-3 text-xs text-gray-500">
