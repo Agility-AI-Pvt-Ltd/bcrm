@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { failureText } from "@/lib/api";
 import {
   formatDay,
@@ -20,15 +20,19 @@ import {
  * worth less than one that does not, because the developer only has to find a single
  * soft claim to dismiss the rest.
  */
-export default function DossierPanel() {
-  const [phone, setPhone] = useState("");
+export default function DossierPanel({
+  phone,
+  onClose,
+}: {
+  phone: string;
+  onClose: () => void;
+}) {
   const [dossier, setDossier] = useState<Dossier | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
   const look = async () => {
-    if (!phone.trim()) return;
     setLoading(true);
     setError("");
     try {
@@ -40,6 +44,12 @@ export default function DossierPanel() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    void look();
+    // The drawer owns one buyer for its lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phone]);
 
   const copySummary = async () => {
     if (!dossier) return;
@@ -53,38 +63,31 @@ export default function DossierPanel() {
   };
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
-      <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-        Commission dossier
-      </h3>
-      <p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
-        Everything on record for one buyer: the registration and its timestamp, the
-        first time they wrote in, and every site visit with what can be proved about
-        it.
-      </p>
+    <div className="fixed inset-0 z-50 bg-gray-900/30" role="presentation" onClick={onClose}>
+      <section
+        className="absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto border-l border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-800 dark:bg-gray-950 lg:p-7"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dossier-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-500">
+              Commission evidence
+            </p>
+            <h3 id="dossier-title" className="mt-1 text-xl font-semibold text-gray-900 dark:text-white/95">
+              Buyer dossier
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{phone}</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:border-brand-400 hover:text-brand-600 dark:border-gray-700 dark:text-gray-300" aria-label="Close dossier">
+            Close
+          </button>
+        </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        <input
-          value={phone}
-          onChange={(event) => setPhone(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") void look();
-          }}
-          placeholder="Buyer's phone number"
-          inputMode="tel"
-          className="h-10 w-56 rounded-lg border border-gray-300 bg-transparent px-3 text-sm outline-none focus:border-brand-500 dark:border-gray-700 dark:text-white/90"
-        />
-        <button
-          type="button"
-          disabled={loading}
-          onClick={() => void look()}
-          className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
-        >
-          {loading ? "Building…" : "Build dossier"}
-        </button>
-      </div>
-
-      {error ? <p className="mt-3 text-sm text-error-500">{error}</p> : null}
+        {loading ? <p className="mt-8 text-sm text-gray-500">Building dossier from persisted records…</p> : null}
+        {error ? <p className="mt-4 rounded-lg bg-error-50 px-3 py-2 text-sm text-error-600 dark:bg-error-500/10 dark:text-error-400">{error}</p> : null}
 
       {dossier ? (
         <div className="mt-5 space-y-4">
@@ -149,6 +152,20 @@ export default function DossierPanel() {
             </div>
           ) : null}
 
+          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+            <h4 className="text-sm font-medium text-gray-800 dark:text-white/90">Claim history</h4>
+            {dossier.claims.length ? (
+              <ul className="mt-2 space-y-2">
+                {dossier.claims.map((claim, index) => (
+                  <li key={`${String(claim.registration_no || "claim")}-${index}`} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span className="text-gray-700 dark:text-gray-300">{String(claim.registration_no || "Unnumbered claim")} · {String(claim.project_name || "Project unavailable")}</span>
+                    <span className="text-xs text-gray-500">{String(claim.status || "status unavailable")}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="mt-2 text-sm text-gray-500">No additional claim records are available.</p>}
+          </div>
+
           {dossier.first_contact ? (
             <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
               <h4 className="text-sm font-medium text-gray-800 dark:text-white/90">
@@ -170,7 +187,9 @@ export default function DossierPanel() {
                 </p>
               ) : null}
             </div>
-          ) : null}
+          ) : (
+            <div className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700">No inbound conversation evidence is available for this buyer.</div>
+          )}
 
           {dossier.visits.length ? (
             <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
@@ -215,7 +234,9 @@ export default function DossierPanel() {
                 ))}
               </ul>
             </div>
-          ) : null}
+          ) : (
+            <div className="rounded-xl border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700">No site-visit records are available for this buyer.</div>
+          )}
 
           {dossier.gaps.length ? (
             <div className="rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
@@ -233,6 +254,7 @@ export default function DossierPanel() {
           ) : null}
         </div>
       ) : null}
-    </section>
+      </section>
+    </div>
   );
 }
