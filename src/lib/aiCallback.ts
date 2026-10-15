@@ -11,6 +11,15 @@ export type AiCallbackSettings = {
   delay_minutes: number;
   min_delay_minutes: number;
   max_delay_minutes: number;
+  /**
+   * Whether BCRM has allowed this account to use AI calling at all. False means
+   * the switch above cannot be turned on — and if it was already on, it has
+   * stopped taking effect. `enabled` is still reported as stored, so being
+   * allowed again restores the setting rather than losing it.
+   */
+  admin_allowed: boolean;
+  /** Why it is unavailable, in words to show. Null when `admin_allowed`. */
+  not_allowed_reason: string | null;
   /** False when this deployment cannot place calls yet (Vobiz, caller ID…). */
   voice_ready: boolean;
   warnings: string[];

@@ -120,6 +120,10 @@ export type AiCallbackPhase =
   | "checking"
   /** The "can we call you?" message has gone out; the answer decides. */
   | "awaiting_consent"
+  /** They want a call but not now, and are picking a time from the list. */
+  | "awaiting_time"
+  /** They picked an hour and were told it. The AI rings then. */
+  | "call_booked"
   | "cancelled"
   | "skipped"
   | "dialing"
@@ -139,8 +143,11 @@ export type AiCallbackView = {
   call_status: string | null;
   outcome: string | null;
   whatsapp_status: string | null;
-  /** asked | granted | refused | unanswered — null before we asked. */
+  /** asked | granted | later | scheduled | refused | unanswered — null before
+   * we asked. */
   consent_status?: string | null;
+  /** The hour the customer asked to be called at, once they have picked one. */
+  scheduled_for?: string | null;
 };
 
 /** Phases that will change on their own, so the screen should keep checking. */

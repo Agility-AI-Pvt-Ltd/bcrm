@@ -38,6 +38,14 @@ export type DigestSettingsUpdate = {
   skip_when_empty?: boolean;
 };
 
+/** One site visit on the digest's day, as the message prints it. */
+export type DigestVisit = {
+  /** "10:30 AM", already in the agency's timezone. */
+  time_label: string;
+  customer: string;
+  property_label: string | null;
+};
+
 export type DigestCounts = {
   new_leads: number;
   hot: number;
@@ -47,6 +55,31 @@ export type DigestCounts = {
   not_contacted: number;
   visits_today: number;
   unanswered: number;
+  /** Today's visits in order. Can be shorter than `visits_today` — the count is
+   * the truth, the list is what the message has room for. */
+  visits?: DigestVisit[];
+};
+
+/**
+ * What one person wants in their own digest. Personal, not agency-wide: one
+ * teammate hiding the hot/warm/cold breakdown does not change what the rest of
+ * the office reads at 9am.
+ *
+ * The caveat `template_applies` carries: a Meta template is approved as one
+ * fixed body, so when the digest goes out on the template every line is in it
+ * whatever is chosen here. These choices shape the free-form message — what is
+ * sent inside WhatsApp's 24-hour window, and what the preview shows.
+ */
+export type DigestSection = {
+  key: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+};
+
+export type DigestPreferences = {
+  sections: DigestSection[];
+  template_applies: boolean;
 };
 
 export type DigestRecipient = {
@@ -198,3 +231,16 @@ export const TIMEZONES = [
   "America/New_York",
   "UTC",
 ];
+
+/** This person's own digest sections. */
+export async function getDigestPreferences() {
+  return apiFetch<DigestPreferences>("/api/v1/digest/preferences");
+}
+
+/** Switch sections on or off. Only the keys sent are changed. */
+export async function updateDigestPreferences(sections: Record<string, boolean>) {
+  return apiFetch<DigestPreferences>("/api/v1/digest/preferences", {
+    method: "PUT",
+    body: JSON.stringify({ sections }),
+  });
+}

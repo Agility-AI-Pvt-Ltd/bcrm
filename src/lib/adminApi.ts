@@ -42,6 +42,10 @@ export type AccountReview = {
   organization_name?: string | null;
   signed_up_at: string;
   is_enabled: boolean;
+  /** Whether the operator has allowed this account to use the AI callback at
+   * all. Separate from the agency's own on/off switch, which only takes effect
+   * while this is true. */
+  ai_callback_allowed: boolean;
   subscription_id?: string | null;
   plan_code?: string | null;
   plan_name?: string | null;
@@ -192,6 +196,54 @@ export async function decideAccount(
     method: "POST",
     body: JSON.stringify({ note: note?.trim() || null }),
   });
+}
+
+// --- feature grants ---------------------------------------------------------
+//
+// What an agency is allowed to use, as opposed to whether they have paid. The
+// AI callback is the first: it dials their customers on our telephony account,
+// so the operator decides whether they may, and the agency decides whether they
+// do. Revoking here leaves the agency's own switch alone; it just stops having
+// any effect.
+
+export const FEATURE_AI_CALLBACK = "ai_callback";
+
+export type FeatureGrant = {
+  feature: string;
+  label: string;
+  description: string;
+  allowed: boolean;
+  note?: string | null;
+  decided_at?: string | null;
+  decided_by?: string | null;
+};
+
+export type OrganizationFeatureGrants = {
+  organization_id: string;
+  items: FeatureGrant[];
+};
+
+export async function fetchAccountFeatures(
+  userId: string,
+): Promise<OrganizationFeatureGrants> {
+  return adminFetch<OrganizationFeatureGrants>(
+    `/api/v1/admin/accounts/${userId}/features`,
+  );
+}
+
+export async function setAccountFeature(
+  userId: string,
+  feature: string,
+  allowed: boolean,
+  note?: string,
+): Promise<OrganizationFeatureGrants> {
+  return adminFetch<OrganizationFeatureGrants>(
+    `/api/v1/admin/accounts/${userId}/features/${feature}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({ allowed, note: note?.trim() || null }),
+    },
+  );
 }
 
 // --- what each account costs us to serve ------------------------------------

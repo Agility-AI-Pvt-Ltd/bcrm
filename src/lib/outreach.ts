@@ -247,10 +247,33 @@ export type LeadPage = {
   offset: number;
 };
 
+/**
+ * The agent's working window. An agent does not work a list of everyone who ever
+ * wrote in — they work today, and on Monday they work the week.
+ *
+ * Calendar periods in the agency's own timezone, matched on last activity, so
+ * "today" means everyone who said something today rather than the last 24 hours.
+ */
+export type LeadPeriod = "day" | "week" | "month" | "all";
+
+export const LEAD_PERIODS: Array<{ value: LeadPeriod; label: string }> = [
+  { value: "day", label: "Today" },
+  { value: "week", label: "This week" },
+  { value: "month", label: "This month" },
+  { value: "all", label: "All time" },
+];
+
 export type PipelineSnapshot = {
   stages: string[];
   tiers: string[];
   counts: Record<string, number>;
+  /** The window these numbers cover — echoed back, so the page can trust it. */
+  period?: LeadPeriod | string;
+  /** "Today" / "This week", worded by the server so both codebases agree. */
+  period_label?: string;
+  /** The first moment counted, in UTC. Null for all time. */
+  period_start?: string | null;
+  periods?: string[];
 };
 
 export type OfficeSnapshot = {
@@ -353,8 +376,16 @@ export async function listCampaignRecipients(
 // Pipeline
 // ---------------------------------------------------------------------------
 
-export async function getPipeline() {
-  return apiFetch<PipelineSnapshot>("/api/v1/outreach/pipeline");
+/**
+ * The totals above the lead list.
+ *
+ * `period` must match the one passed to `listLeads`, or the headline counts
+ * everyone while the list below shows today — which is a board that lies about
+ * the first number an agent reads.
+ */
+export async function getPipeline(period: LeadPeriod = "all") {
+  const query = new URLSearchParams({ period });
+  return apiFetch<PipelineSnapshot>(`/api/v1/outreach/pipeline?${query}`);
 }
 
 /**
@@ -372,6 +403,8 @@ export async function listLeads(
     replied?: boolean;
     awaitingCallback?: boolean;
     search?: string;
+    /** Today / this week / this month, matched on last activity. */
+    period?: LeadPeriod;
     limit?: number;
     offset?: number;
   } = {},
@@ -382,6 +415,7 @@ export async function listLeads(
   if (params.replied) query.set("replied", "true");
   if (params.awaitingCallback) query.set("awaiting_callback", "true");
   if (params.search) query.set("search", params.search);
+  if (params.period && params.period !== "all") query.set("period", params.period);
   query.set("limit", String(params.limit ?? 50));
   query.set("offset", String(params.offset ?? 0));
   return apiFetch<LeadPage>(`/api/v1/outreach/leads?${query}`);

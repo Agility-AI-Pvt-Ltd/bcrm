@@ -4,6 +4,7 @@ import { useState } from "react";
 import DigestHistoryTable from "./DigestHistoryTable";
 import DigestNumberCard from "./DigestNumberCard";
 import DigestPreviewCard from "./DigestPreviewCard";
+import DigestSectionsCard from "./DigestSectionsCard";
 import DigestSettingsCard from "./DigestSettingsCard";
 
 /**
@@ -49,6 +50,7 @@ export default function DailyDigestPage() {
 
       <DigestSettingsCard onChanged={refresh} />
       <DigestNumberCard onSaved={refresh} />
+      <DigestSectionsCard onChanged={refresh} />
       <DigestPreviewCard refreshKey={version} onSent={refresh} />
       <DigestHistoryTable refreshKey={version} />
     </div>
