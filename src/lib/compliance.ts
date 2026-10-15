@@ -359,3 +359,32 @@ export function dueLabel(value: string | null | undefined): string {
   if (days === 0) return "due today";
   return `${days} day${days === 1 ? "" : "s"} left`;
 }
+
+/** How much attention a request's deadline deserves.
+ *
+ *  A data request carries a legal answer-by date, and "overdue by 3 days" and
+ *  "20 days left" read identically as plain grey text. This is what lets the list
+ *  show the difference without anybody having to do the arithmetic.
+ */
+export type DueTone = "overdue" | "soon" | "ok" | "none";
+
+/** Inside this many days, a deadline is worth flagging rather than just stating. */
+export const DUE_SOON_DAYS = 7;
+
+export function dueTone(value: string | null | undefined): DueTone {
+  if (!value) return "none";
+  const due = new Date(value);
+  if (Number.isNaN(due.getTime())) return "none";
+  const days = Math.ceil((due.getTime() - Date.now()) / 86_400_000);
+  if (days < 0) return "overdue";
+  if (days <= DUE_SOON_DAYS) return "soon";
+  return "ok";
+}
+
+export const DUE_CLASS: Record<DueTone, string> = {
+  overdue:
+    "bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400",
+  soon: "bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400",
+  ok: "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300",
+  none: "bg-gray-100 text-gray-600 dark:bg-white/[0.06] dark:text-gray-300",
+};
