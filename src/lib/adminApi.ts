@@ -308,6 +308,37 @@ export type UsageRate = {
   note: string | null;
   /** False for a unit we know how to meter and nobody has priced yet. */
   configured: boolean;
+  /** The window the two usage figures below cover. */
+  usage_days: number;
+  /** Units metered against this key in that window, across every account. */
+  usage_quantity: string;
+  /** What that came to. Null when the unit is unpriced — the usage is real and
+   * the money is unknown, which is not the same as nothing. */
+  usage_amount: string | null;
+};
+
+/**
+ * One price a model proposed.
+ *
+ * Not a price until an operator applies it. These come from what the model was
+ * trained on rather than from an invoice, so each carries the basis it worked
+ * from and the screen says plainly that they are estimates.
+ */
+export type RateSuggestion = {
+  kind: string;
+  key: string;
+  unit: string;
+  amount: string;
+  basis: string;
+};
+
+export type RateSuggestions = {
+  items: RateSuggestion[];
+  /** How many units were asked about — usually more than came back. */
+  asked: number;
+  notice: string;
+  /** False when no model is configured, so an empty answer can be explained. */
+  available: boolean;
 };
 
 export async function listAccountSpend(days = 30): Promise<AccountSpend[]> {
@@ -323,8 +354,18 @@ export async function getAccountSpend(
   );
 }
 
-export async function listUsageRates(): Promise<UsageRate[]> {
-  return adminFetch<UsageRate[]>("/api/v1/admin/rates");
+export async function listUsageRates(usageDays = 30): Promise<UsageRate[]> {
+  return adminFetch<UsageRate[]>(`/api/v1/admin/rates?usage_days=${usageDays}`);
+}
+
+/**
+ * Ask the model to price the card. Writes nothing — what comes back fills the
+ * boxes, and the operator applies it.
+ */
+export async function suggestUsageRates(): Promise<RateSuggestions> {
+  return adminFetch<RateSuggestions>("/api/v1/admin/rates/suggest", {
+    method: "POST",
+  });
 }
 
 export async function setUsageRate(input: {

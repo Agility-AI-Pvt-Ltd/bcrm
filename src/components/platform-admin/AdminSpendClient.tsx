@@ -10,45 +10,14 @@ import {
   listUsageRates,
   quantity,
   rupees,
-  setUsageRate,
   type AccountSpend,
   type AccountSpendDetail,
   type UsageRate,
 } from "@/lib/adminApi";
+import AdminNav from "./AdminNav";
+import AdminRateCard, { unpricedCount } from "./AdminRateCard";
 
 const WINDOWS = [7, 30, 90];
-
-/**
- * The rate screen in the order an operator reconciles their invoices: the phone
- * bill, the Sarvam bill, the model bill, then WhatsApp. Grouping matters here
- * because the keys alone ("stt_minute") do not say which invoice they came from.
- */
-const GROUPS: Array<{ kind: string; title: string; blurb: string }> = [
-  {
-    kind: "call",
-    title: "AI calls — telephony",
-    blurb:
-      "What the phone provider charges per connected minute. Telephony only; the AI running during the call is priced below.",
-  },
-  {
-    kind: "sarvam",
-    title: "Sarvam voice",
-    blurb:
-      "Speech-to-text and text-to-speech during a call, both per connected minute — the only quantity the voice agent reports back.",
-  },
-  {
-    kind: "llm",
-    title: "AI text — per thousand tokens",
-    blurb:
-      "Input and output are priced separately, per model. Covers text the CRM generates; the model running inside a call is not metered per token.",
-  },
-  {
-    kind: "whatsapp",
-    title: "WhatsApp — per message",
-    blurb: "Meta's price per conversation category.",
-  },
-  { kind: "storage", title: "Storage", blurb: "Per GB-month of stored media." },
-];
 
 function when(value?: string | null) {
   if (!value) return "—";
@@ -74,11 +43,12 @@ export default function AdminSpendClient() {
   const [days, setDays] = useState(30);
   const [accounts, setAccounts] = useState<AccountSpend[]>([]);
   const [selected, setSelected] = useState<AccountSpendDetail | null>(null);
+  // Kept only for the "n unset" badge on the toggle: the card itself owns the
+  // rates it edits, and a second writable copy here is how the two would drift.
   const [rates, setRates] = useState<UsageRate[]>([]);
   const [showRates, setShowRates] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState("");
 
   useEffect(() => {
     if (!getAdminToken()) router.replace("/admin/login");
@@ -112,33 +82,11 @@ export default function AdminSpendClient() {
     }
   };
 
-  const price = async (rate: UsageRate, amount: string) => {
-    setSaving(`${rate.kind}:${rate.key}`);
-    setError("");
-    try {
-      const saved = await setUsageRate({
-        kind: rate.kind,
-        key: rate.key,
-        unit: rate.unit,
-        amount: amount.trim() === "" ? null : amount.trim(),
-      });
-      setRates((current) =>
-        current.map((row) =>
-          row.kind === saved.kind && row.key === saved.key ? saved : row,
-        ),
-      );
-      await load(days);
-    } catch (err) {
-      setError(failureText(err, "Could not save that rate."));
-    } finally {
-      setSaving("");
-    }
-  };
-
-  const unpriced = rates.filter((rate) => rate.amount === null).length;
+  const unpriced = unpricedCount(rates);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
+      <AdminNav />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
@@ -182,65 +130,13 @@ export default function AdminSpendClient() {
       {error ? <p className="mt-4 text-sm text-error-500">{error}</p> : null}
 
       {showRates ? (
-        <section className="mt-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-          <h2 className="text-sm font-semibold text-gray-800 dark:text-white/90">
-            What a unit costs
-          </h2>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Set these from your own provider invoices. A price applies to usage from
-            today onwards — anything already metered keeps the rate it was costed at,
-            so last month&apos;s figures never move. Leave a box empty to record a unit
-            as deliberately unpriced: its usage is still counted and reported as
-            unpriced, never as free.
-          </p>
-          {GROUPS.map((group) => {
-            const rows = rates.filter((rate) => rate.kind === group.kind);
-            if (rows.length === 0) return null;
-            return (
-              <div key={group.kind} className="mt-5">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-brand-500">
-                  {group.title}
-                </h3>
-                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                  {group.blurb}
-                </p>
-                <ul className="mt-2 divide-y divide-gray-100 dark:divide-gray-800">
-                  {rows.map((rate) => (
-                    <li
-                      key={`${rate.kind}:${rate.key}`}
-                      className="flex flex-wrap items-start justify-between gap-3 py-2.5"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-gray-800 dark:text-white/90">
-                          {rate.key}
-                          <span className="ml-2 text-xs font-normal text-gray-500">
-                            per {rate.unit_label}
-                          </span>
-                        </p>
-                        {rate.help ? (
-                          <p className="mt-0.5 max-w-xl text-xs text-gray-500 dark:text-gray-400">
-                            {rate.help}
-                          </p>
-                        ) : null}
-                        <p className="mt-0.5 text-xs text-gray-400">
-                          {rate.effective_from
-                            ? `In force from ${rate.effective_from}`
-                            : "Not priced yet"}
-                        </p>
-                      </div>
-                      <RateInput
-                        key={`${rate.kind}:${rate.key}:${rate.amount ?? ""}`}
-                        rate={rate}
-                        busy={saving === `${rate.kind}:${rate.key}`}
-                        onSave={(amount) => void price(rate, amount)}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-        </section>
+        // The same card the Rates page shows. Here because the commonest reason
+        // a total looks wrong is a unit nobody has priced, and the fix should be
+        // three feet away rather than in a deploy. Saving one re-reads the
+        // spend, whose figures are computed from these numbers.
+        <div className="mt-5">
+          <AdminRateCard onSaved={() => void load(days)} />
+        </div>
       ) : null}
 
       {loading ? (
@@ -407,42 +303,6 @@ export default function AdminSpendClient() {
           </div>
         </section>
       ) : null}
-    </div>
-  );
-}
-
-function RateInput({
-  rate,
-  busy,
-  onSave,
-}: {
-  rate: UsageRate;
-  busy: boolean;
-  onSave: (amount: string) => void;
-}) {
-  // Seeded once, from the rate this input was mounted for. The parent remounts it
-  // on a new amount by including that amount in the key, which is why there is no
-  // effect here syncing props into state — that pattern costs a cascading render
-  // and gets the two out of step the moment a save is in flight.
-  const [value, setValue] = useState(rate.amount ?? "");
-
-  return (
-    <div className="flex items-center gap-2">
-      <input
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        inputMode="decimal"
-        placeholder="not set"
-        className="h-9 w-28 rounded-lg border border-gray-300 bg-transparent px-3 text-sm outline-none focus:border-brand-500 dark:border-gray-700 dark:text-white/90"
-      />
-      <button
-        type="button"
-        disabled={busy || value === (rate.amount ?? "")}
-        onClick={() => onSave(value)}
-        className="h-9 rounded-lg bg-brand-500 px-3 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-40"
-      >
-        {busy ? "…" : "Save"}
-      </button>
     </div>
   );
 }

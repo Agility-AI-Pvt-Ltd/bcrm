@@ -48,6 +48,29 @@ export default function DailyDigestPage() {
         </ol>
       </section>
 
+      {/* Discoverability for the on-demand path. The 9am send is a template, so
+          it depends on Meta's approval and the account's billing currency and
+          goes quiet when either is missing — this one depends on neither, and
+          nobody would guess it exists. */}
+      <section className="rounded-2xl border border-brand-200 bg-brand-50/50 p-5 dark:border-brand-500/30 dark:bg-brand-500/10 lg:p-6">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+          Or just message your own business number
+        </h3>
+        <p className="mt-1 max-w-3xl text-sm text-gray-600 dark:text-gray-300">
+          Send <strong>hi</strong> from the personal WhatsApp number you saved below, and
+          you&rsquo;ll get three buttons back: today&rsquo;s numbers, this week&rsquo;s, and who
+          is waiting for a call. Tap one and it arrives straight away.
+        </p>
+        <p className="mt-2 max-w-3xl text-xs text-gray-500 dark:text-gray-400">
+          This works even when the 9am digest does not. The morning message is a template,
+          so it needs Meta&rsquo;s approval and a billing currency set on your WhatsApp
+          account; asking for one yourself opens the 24-hour window, and the reply goes
+          back as an ordinary chat message with neither requirement. You can also type{" "}
+          <strong>today</strong>, <strong>week</strong> or <strong>calls</strong> instead of
+          tapping.
+        </p>
+      </section>
+
       <DigestSettingsCard onChanged={refresh} />
       <DigestNumberCard onSaved={refresh} />
       <DigestSectionsCard onChanged={refresh} />
