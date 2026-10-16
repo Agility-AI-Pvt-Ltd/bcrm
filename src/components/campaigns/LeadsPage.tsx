@@ -45,6 +45,11 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
 import {
+  bandBadgeColor,
+  interestBand,
+  interestLabel,
+} from "@/lib/inbox";
+import {
   CUSTOMER_STAGES,
   ENGAGEMENT_TIERS,
   LEAD_PERIODS,
@@ -529,12 +534,12 @@ export default function LeadsPage() {
           })}
         </div>
 
-        {/* `min-w-max` here meant "never narrower than my widest row", which with nine
+        {/* `min-w-max` here meant "never narrower than my widest row", which with ten
             never-wrapping columns is wider than any laptop. Paired with a flex ancestor
             that had no `min-w-0`, that is what made the whole page scroll sideways.
 
             The columns a broker scans least often now give way first, so the ones they
-            act on — who, what they said, and the call button — always fit. The
+            act on — who, what they said, score, and the call button — always fit. The
             breakpoints look arbitrary because they are measured: the table only gets
             the viewport minus the 290px sidebar and 48px of padding, so each column
             has to wait about 340px longer than a plain `lg:`/`xl:` would imply. Nothing
@@ -547,6 +552,7 @@ export default function LeadsPage() {
                 <th className="px-5 py-3 font-medium">Lead</th>
                 <th className="px-5 py-3 font-medium">What they said</th>
                 <th className="px-5 py-3 font-medium">Stage</th>
+                <th className="px-5 py-3 font-medium">Score</th>
                 <th className="hidden px-5 py-3 font-medium min-[1320px]:table-cell">Engagement</th>
                 <th className="hidden px-5 py-3 font-medium min-[1740px]:table-cell">
                   Looking for
@@ -564,13 +570,13 @@ export default function LeadsPage() {
             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan={10} className="px-5 py-10 text-center text-gray-500">
                     Loading leads…
                   </td>
                 </tr>
               ) : !page || page.items.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-gray-500">
+                  <td colSpan={10} className="px-5 py-10 text-center text-gray-500">
                     {awaitingOnly
                       ? "Nobody is waiting for a call right now."
                       : filtered
@@ -632,6 +638,25 @@ function whatsappHref(phone: string | null) {
   if (!phone) return null;
   const digits = phone.replace(/\D/g, "");
   return digits.length >= 10 ? `https://wa.me/${digits}` : null;
+}
+
+/** The LLM's 0–100 interest read. Null means never scored, not zero. */
+function LeadScore({ score }: { score: number | null }) {
+  const band = interestBand(score);
+  if (score === null || band === null) {
+    return (
+      <span className="text-gray-400" title="Not scored yet">
+        —
+      </span>
+    );
+  }
+  return (
+    <span title={interestLabel(score)}>
+      <Badge color={bandBadgeColor(band)} size="sm">
+        {score}
+      </Badge>
+    </span>
+  );
 }
 
 function LeadRow({
@@ -700,6 +725,9 @@ function LeadRow({
         <Badge color={stageBadgeColor(lead.customer_stage)} size="sm">
           {lead.customer_stage}
         </Badge>
+      </td>
+      <td className="px-5 py-3">
+        <LeadScore score={lead.intent_score} />
       </td>
       <td className="hidden px-5 py-3 min-[1320px]:table-cell">
         <div className="flex items-center gap-2">

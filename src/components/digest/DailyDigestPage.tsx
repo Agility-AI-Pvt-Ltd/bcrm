@@ -57,17 +57,24 @@ export default function DailyDigestPage() {
           Or just message your own business number
         </h3>
         <p className="mt-1 max-w-3xl text-sm text-gray-600 dark:text-gray-300">
-          Send <strong>hi</strong> from the personal WhatsApp number you saved below, and
-          you&rsquo;ll get three buttons back: today&rsquo;s numbers, this week&rsquo;s, and who
-          is waiting for a call. Tap one and it arrives straight away.
+          Send <strong>hi</strong> from the personal WhatsApp number you saved below and pick
+          from the list: <strong>new leads</strong> you haven&rsquo;t seen, today&rsquo;s
+          numbers, this week&rsquo;s, or who is waiting for a call. Tap one and it arrives
+          straight away.
+        </p>
+        <p className="mt-2 max-w-3xl text-sm text-gray-600 dark:text-gray-300">
+          You also get a card the moment a customer stops replying — their name, number,
+          score and what they asked for. If WhatsApp won&rsquo;t carry it, that lead waits in{" "}
+          <strong>New leads</strong> until you ask for it, so nothing is lost. A lead that
+          later warms up from cold to warm, or warm to hot, comes back there too.
         </p>
         <p className="mt-2 max-w-3xl text-xs text-gray-500 dark:text-gray-400">
           This works even when the 9am digest does not. The morning message is a template,
           so it needs Meta&rsquo;s approval and a billing currency set on your WhatsApp
           account; asking for one yourself opens the 24-hour window, and the reply goes
           back as an ordinary chat message with neither requirement. You can also type{" "}
-          <strong>today</strong>, <strong>week</strong> or <strong>calls</strong> instead of
-          tapping.
+          <strong>leads</strong>, <strong>today</strong>, <strong>week</strong> or{" "}
+          <strong>calls</strong> instead of tapping.
         </p>
       </section>
 

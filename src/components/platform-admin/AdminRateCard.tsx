@@ -75,6 +75,9 @@ type Props = {
 
 const rateId = (rate: { kind: string; key: string }) => `${rate.kind}:${rate.key}`;
 
+/** A unit somebody has deliberately recorded as costing nothing. */
+const isFree = (rate: UsageRate) => rate.amount !== null && Number(rate.amount) === 0;
+
 export default function AdminRateCard({
   onSaved,
   refreshKey = 0,
@@ -201,7 +204,10 @@ export default function AdminRateCard({
   };
 
   const drafts = useMemo(() => Object.keys(draft).length, [draft]);
-  const unpriced = rates.filter((rate) => rate.amount === null).length;
+  const unpricedKeys = useMemo(
+    () => rates.filter((rate) => rate.amount === null).map((rate) => rate.key),
+    [rates],
+  );
 
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
@@ -221,11 +227,23 @@ export default function AdminRateCard({
               </p>
             </>
           ) : null}
-          {unpriced ? (
-            <p className="mt-2 text-xs font-medium text-warning-600">
-              {unpriced} unit{unpriced === 1 ? "" : "s"} unpriced — their usage is
-              counted and reported as unpriced, never as free.
-            </p>
+          {unpricedKeys.length ? (
+            // Names them. A count alone says there is a problem and not which
+            // one, and the two ways to clear a row are not obvious: a price, or
+            // 0 for a unit that genuinely costs nothing.
+            <div className="mt-2 text-xs text-warning-700 dark:text-warning-400">
+              <p className="font-medium">
+                {unpricedKeys.length} unit{unpricedKeys.length === 1 ? "" : "s"} have no
+                price yet: {unpricedKeys.slice(0, 4).join(", ")}
+                {unpricedKeys.length > 4 ? ` and ${unpricedKeys.length - 4} more` : ""}.
+              </p>
+              <p className="mt-1 text-gray-600 dark:text-gray-400">
+                Their usage is still counted, and reported as unpriced rather than free.
+                Enter the price from your invoice — or <strong>0</strong> if the unit
+                genuinely costs nothing, like a free model tier or a WhatsApp conversation
+                the customer started.
+              </p>
+            </div>
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -308,9 +326,14 @@ export default function AdminRateCard({
                       ) : null}
                       <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
                         <span>
-                          {rate.effective_from
-                            ? `In force from ${rate.effective_from}`
-                            : "Not priced yet"}
+                          {/* Zero is a priced unit, not a blank one. Saying
+                              "Free" is what stops an operator reading their own
+                              deliberate answer back as a gap in the card. */}
+                          {rate.amount === null
+                            ? "Not priced yet"
+                            : `${isFree(rate) ? "Free" : "Priced"} · in force from ${
+                                rate.effective_from ?? "today"
+                              }`}
                         </span>
                         {detailed ? (
                           <span>
