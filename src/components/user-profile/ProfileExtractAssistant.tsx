@@ -87,6 +87,7 @@ export default function ProfileExtractAssistant({
       setResult(analysis);
       setEditable(analysis.proposed || {});
       const defaults = (analysis.field_diffs || [])
+        .filter((item) => item.field !== "address")
         .filter((item) => item.proposed != null && item.proposed !== "")
         .map((item) => item.field);
       setSelectedFields(defaults);
@@ -129,7 +130,7 @@ export default function ProfileExtractAssistant({
     try {
       const applied = await applyProfileIntelligence({
         profile: editable,
-        selected_fields: selectedFields,
+        selected_fields: selectedFields.filter((field) => field !== "address"),
         merge_work_locations: mergeLocations,
       });
       setNotice(applied.message);
@@ -286,7 +287,9 @@ export default function ProfileExtractAssistant({
                     Confirm before saving
                   </p>
                   <div className="space-y-3">
-                    {result.field_diffs.map((diff) => {
+                    {result.field_diffs
+                      .filter((diff) => diff.field !== "address")
+                      .map((diff) => {
                       const checked = selectedFields.includes(diff.field);
                       const isLocations = diff.field === "work_locations";
                       const editValue = isLocations

@@ -47,7 +47,6 @@ export default function EditProfileForm() {
         office_phone: String(form.get("office_phone") || "").trim() || null,
         // An empty string clears it, which is how somebody stops their digest.
         digest_whatsapp: String(form.get("digest_whatsapp") || "").trim(),
-        address: String(form.get("address") || "").trim() || null,
         office_address: String(form.get("office_address") || "").trim() || null,
         bio: String(form.get("bio") || "").trim() || null,
       });
@@ -160,15 +159,6 @@ export default function EditProfileForm() {
             <label className="block text-sm">
               <span className="mb-1.5 block text-gray-500">Bio</span>
               <input name="bio" defaultValue={user?.bio || ""} className={fieldClass} />
-            </label>
-            <label className="block text-sm lg:col-span-2">
-              <span className="mb-1.5 block text-gray-500">Address</span>
-              <textarea
-                name="address"
-                defaultValue={user?.address || ""}
-                placeholder="Home / personal address"
-                className={areaClass}
-              />
             </label>
             <label className="block text-sm lg:col-span-2">
               <span className="mb-1.5 block text-gray-500">Office address</span>

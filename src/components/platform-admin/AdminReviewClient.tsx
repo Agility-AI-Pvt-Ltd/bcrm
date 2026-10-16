@@ -1,16 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ApiError, failureText } from "@/lib/api";
+import AdminNav from "./AdminNav";
 import {
-  clearAdminSession,
   decideAccount,
   FEATURE_AI_CALLBACK,
   fetchQueueCounts,
   getAdminToken,
-  getStoredAdmin,
   listAccounts,
   setAccountFeature,
   type AccountFilter,
@@ -77,8 +75,6 @@ export default function AdminReviewClient() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
-
-  const admin = getStoredAdmin();
 
   useEffect(() => {
     if (!getAdminToken()) {
@@ -163,47 +159,24 @@ export default function AdminReviewClient() {
     }
   };
 
-  const signOut = () => {
-    clearAdminSession();
-    router.replace("/admin/login");
-  };
-
   if (!ready) return null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-brand-500">
-            EstateFlow operator
-          </p>
-          <h1 className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white/90">
-            Account verification
-          </h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Confirm the payment against your bank statement, then open the account.
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-sm font-medium text-gray-800 dark:text-white/90">
-            {admin?.name || admin?.email}
-          </p>
-          <div className="mt-1 flex items-center justify-end gap-3">
-            <Link
-              href="/admin/spend"
-              className="text-xs text-brand-500 underline hover:text-brand-600"
-            >
-              Account spend
-            </Link>
-            <button
-              type="button"
-              onClick={signOut}
-              className="text-xs text-gray-500 underline hover:text-gray-700 dark:text-gray-400"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
+      {/* Spend and Rates used to be a text link in this corner, which meant an
+          operator who had come to fix a price had to already know where it
+          lived. The nav carries the whole console on every screen. */}
+      <AdminNav />
+      <header className="mb-8">
+        <p className="text-xs font-semibold uppercase tracking-wide text-brand-500">
+          EstateFlow operator
+        </p>
+        <h1 className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white/90">
+          Account verification
+        </h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Confirm the payment against your bank statement, then open the account.
+        </p>
       </header>
 
       {counts ? (
