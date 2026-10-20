@@ -38,12 +38,29 @@ export type DigestSettingsUpdate = {
   skip_when_empty?: boolean;
 };
 
-/** One site visit on the digest's day, as the message prints it. */
+/**
+ * Where a visit stands. `passed` means the slot ended and nobody recorded a
+ * check-in, completion or no-show — the visits an agent most needs to chase.
+ */
+export type DigestVisitState = "upcoming" | "passed" | "checked_in" | "completed" | "no_show";
+
+/** One site visit, as the message prints it. */
 export type DigestVisit = {
-  /** "10:30 AM", already in the agency's timezone. */
+  /** "10:30 AM" for today, "Mon 19 Oct, 4:00 PM" for an earlier day. */
   time_label: string;
   customer: string;
   property_label: string | null;
+  /** Absent from servers older than this field; treat as upcoming. */
+  state?: DigestVisitState;
+  phone?: string | null;
+};
+
+export const VISIT_STATE_LABELS: Record<DigestVisitState, string> = {
+  upcoming: "",
+  passed: "Slot passed — no check-in",
+  checked_in: "Checked in",
+  completed: "Done",
+  no_show: "No-show",
 };
 
 export type DigestCounts = {
@@ -58,6 +75,9 @@ export type DigestCounts = {
   /** Today's visits in order. Can be shorter than `visits_today` — the count is
    * the truth, the list is what the message has room for. */
   visits?: DigestVisit[];
+  /** Earlier visits whose slot passed with nothing recorded (last 7 days). */
+  visits_passed_total?: number;
+  visits_passed?: DigestVisit[];
 };
 
 /**
