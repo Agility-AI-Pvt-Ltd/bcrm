@@ -6,7 +6,9 @@ import {
   formatDigestDate,
   getDigestPreview,
   sendDigestNow,
+  VISIT_STATE_LABELS,
   type DigestPreview,
+  type DigestVisitState,
 } from "@/lib/digest";
 
 type Props = {
@@ -161,6 +163,40 @@ export default function DigestPreviewCard({ refreshKey = 0, onSent }: Props) {
                       {visit.property_label ? (
                         <span className="text-xs text-gray-500">· {visit.property_label}</span>
                       ) : null}
+                      <VisitStateTag state={visit.state} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {/* Earlier visits whose time went by with nothing recorded. Every
+                other list looks forward from today, so without this block a
+                missed visit was never shown again. */}
+            {preview.counts.visits_passed_total ? (
+              <div className="mt-5">
+                <h4 className="text-sm font-medium text-gray-800 dark:text-white/90">
+                  Slots passed, nothing recorded ({preview.counts.visits_passed_total})
+                </h4>
+                <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  Last 7 days. Mark each as completed or no-show to clear it.
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {(preview.counts.visits_passed ?? []).map((visit, index) => (
+                    <li
+                      key={`${visit.time_label}-${index}`}
+                      className="flex flex-wrap items-baseline gap-x-2 text-sm text-gray-700 dark:text-gray-300"
+                    >
+                      <span className="font-medium text-gray-900 dark:text-white/90">
+                        {visit.time_label}
+                      </span>
+                      <span>{visit.customer}</span>
+                      {visit.phone ? (
+                        <span className="text-xs text-gray-500">· {visit.phone}</span>
+                      ) : null}
+                      {visit.property_label ? (
+                        <span className="text-xs text-gray-500">· {visit.property_label}</span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -193,5 +229,19 @@ export default function DigestPreviewCard({ refreshKey = 0, onSent }: Props) {
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** A small status tag after a visit, empty for one that is still to come. */
+function VisitStateTag({ state }: { state?: DigestVisitState }) {
+  if (!state || state === "upcoming") return null;
+  const tone =
+    state === "passed" || state === "no_show"
+      ? "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"
+      : "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400";
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${tone}`}>
+      {VISIT_STATE_LABELS[state]}
+    </span>
   );
 }
