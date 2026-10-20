@@ -17,6 +17,10 @@ type Props = {
   title?: string;
   description?: string;
   onApplied?: (user: AuthUser) => void;
+  /** The panel's id, so the button that opens it can point at it. */
+  id?: string;
+  /** Shown as a close button when the panel was opened from an AI button. */
+  onClose?: () => void;
 };
 
 function formatValue(value: string | string[] | null | undefined) {
@@ -31,6 +35,8 @@ export default function ProfileExtractAssistant({
   title = "AI Profile Fill",
   description = "Paste text or drop a PDF / Excel. AI extracts fields — you confirm before anything is saved.",
   onApplied,
+  id,
+  onClose,
 }: Props) {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -147,21 +153,40 @@ export default function ProfileExtractAssistant({
   };
 
   return (
-    <section className="ai-shine-panel overflow-hidden">
+    <section id={id} aria-label={title} className="ai-shine-panel overflow-hidden">
       <div className="rounded-[0.92rem] bg-white p-5 dark:bg-gray-dark">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-brand-500">
-              LangGraph agent
+              AI assistant
             </p>
             <h3 className="mt-1 text-lg font-semibold text-gray-900 dark:text-white/90">
               {title}
             </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</p>
           </div>
-          <Badge color="info" size="sm">
-            Extract → Polish → Confirm
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge color="info" size="sm">
+              Extract → Polish → Confirm
+            </Badge>
+            {onClose ? (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={`Close ${title}`}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/[0.05] dark:hover:text-gray-200"
+              >
+                <svg viewBox="0 0 20 20" className="h-4 w-4" aria-hidden="true">
+                  <path
+                    d="M5 5l10 10M15 5L5 15"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="space-y-3">

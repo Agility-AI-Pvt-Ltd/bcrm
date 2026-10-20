@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import AiSparkleButton from "@/components/ui/ai/AiSparkleButton";
 import ProfileExtractAssistant from "@/components/user-profile/ProfileExtractAssistant";
 import { ApiError, fetchMe, updateProfile } from "@/lib/auth";
 import { useStoredUser } from "@/hooks/useStoredUser";
@@ -16,6 +17,8 @@ export default function EditProfileForm() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  /** AI Profile Fill stays out of the way until the sparkle button asks for it. */
+  const [aiOpen, setAiOpen] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -60,18 +63,6 @@ export default function EditProfileForm() {
 
   return (
     <div className="space-y-6">
-      <ProfileExtractAssistant
-        focus="profile"
-        title="AI Profile Fill"
-        description="Paste a bio, visiting card notes, or drop a PDF/Excel. LangGraph extracts fields, polishes them with LLM, then waits for your confirmation."
-        onApplied={() => {
-          // The apply call already cached the new user; this just re-mounts the
-          // form so the defaultValue inputs pick the new values up.
-          setFormKey((value) => value + 1);
-          setNotice("AI updates applied to your profile.");
-        }}
-      />
-
       <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -82,16 +73,46 @@ export default function EditProfileForm() {
               Personal and office contact details.
             </p>
           </div>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              user?.is_enabled
-                ? "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400"
-                : "bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"
-            }`}
-          >
-            {user?.is_enabled ? "Enabled" : "Disabled — choose a plan"}
-          </span>
+          <div className="flex items-center gap-3">
+            <AiSparkleButton
+              label="AI Profile Fill"
+              hint="Fill these fields from a bio, visiting card, PDF or Excel. You confirm before anything is saved."
+              open={aiOpen}
+              controls="ai-profile-fill"
+              onClick={() => setAiOpen((value) => !value)}
+            />
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-medium ${
+                user?.is_enabled
+                  ? "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400"
+                  : "bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400"
+              }`}
+            >
+              {user?.is_enabled ? "Enabled" : "Disabled — choose a plan"}
+            </span>
+          </div>
         </div>
+
+        {/* Opens inside the card, under the button that opened it, so the
+            button does not jump away from the cursor. */}
+        {aiOpen ? (
+          <div className="mb-5">
+            <ProfileExtractAssistant
+              id="ai-profile-fill"
+              focus="profile"
+              title="AI Profile Fill"
+              description="Paste a bio, visiting card notes, or drop a PDF/Excel. AI extracts the fields and polishes them, then waits for your confirmation."
+              onClose={() => setAiOpen(false)}
+              onApplied={() => {
+                // The apply call already cached the new user; this just re-mounts the
+                // form so the defaultValue inputs pick the new values up.
+                setFormKey((value) => value + 1);
+                setNotice("AI updates applied to your profile.");
+                setAiOpen(false);
+              }}
+            />
+          </div>
+        ) : null}
 
         {error ? <p className="mb-3 text-sm text-error-500">{error}</p> : null}
         {notice ? <p className="mb-3 text-sm text-success-600">{notice}</p> : null}

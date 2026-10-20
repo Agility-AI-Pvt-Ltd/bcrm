@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import AiSparkleButton from "@/components/ui/ai/AiSparkleButton";
 import ProfileExtractAssistant from "@/components/user-profile/ProfileExtractAssistant";
 import {
   ApiError,
@@ -13,6 +14,8 @@ const fieldClass =
   "h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm dark:border-gray-700 dark:text-white/90";
 
 export default function WorkLocationsForm() {
+  /** Same as AI Profile Fill: hidden until the sparkle button opens it. */
+  const [aiOpen, setAiOpen] = useState(false);
   const [locations, setLocations] = useState<string[]>(
     getStoredUser()?.work_locations || [],
   );
@@ -71,23 +74,43 @@ export default function WorkLocationsForm() {
 
   return (
     <div className="space-y-6">
-      <ProfileExtractAssistant
-        focus="locations"
-        title="AI Work Locations"
-        description="Paste coverage notes or drop a PDF/Excel territory list. AI finds cities and areas, then asks you to confirm before saving."
-        onApplied={(next) => {
-          setLocations(next.work_locations || []);
-          setNotice("AI work locations applied.");
-        }}
-      />
-
       <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Work locations
-        </h3>
-        <p className="mt-1 mb-4 text-sm text-gray-500 dark:text-gray-400">
-          Cities or areas where you or your business operate.
-        </p>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+              Work locations
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Cities or areas where you or your business operate.
+            </p>
+          </div>
+          <AiSparkleButton
+            label="AI Work Locations"
+            hint="Pull cities and areas from coverage notes, a PDF or an Excel list. You confirm before anything is saved."
+            open={aiOpen}
+            controls="ai-work-locations"
+            onClick={() => setAiOpen((value) => !value)}
+          />
+        </div>
+
+        {/* Opens inside the card, under the button that opened it, so the
+            button does not jump away from the cursor. */}
+        {aiOpen ? (
+          <div className="mb-5">
+            <ProfileExtractAssistant
+              id="ai-work-locations"
+              focus="locations"
+              title="AI Work Locations"
+              description="Paste coverage notes or drop a PDF/Excel territory list. AI finds cities and areas, then asks you to confirm before saving."
+              onClose={() => setAiOpen(false)}
+              onApplied={(next) => {
+                setLocations(next.work_locations || []);
+                setNotice("AI work locations applied.");
+                setAiOpen(false);
+              }}
+            />
+          </div>
+        ) : null}
 
         {error ? <p className="mb-3 text-sm text-error-500">{error}</p> : null}
         {notice ? <p className="mb-3 text-sm text-success-600">{notice}</p> : null}
