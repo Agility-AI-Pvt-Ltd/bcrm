@@ -402,6 +402,7 @@ export async function listLeads(
     tier?: string;
     replied?: boolean;
     awaitingCallback?: boolean;
+    multiReply?: boolean;
     search?: string;
     /** Today / this week / this month, matched on last activity. */
     period?: LeadPeriod;
@@ -414,6 +415,7 @@ export async function listLeads(
   if (params.tier) query.set("tier", params.tier);
   if (params.replied) query.set("replied", "true");
   if (params.awaitingCallback) query.set("awaiting_callback", "true");
+  if (params.multiReply) query.set("multi_reply", "true");
   if (params.search) query.set("search", params.search);
   if (params.period && params.period !== "all") query.set("period", params.period);
   query.set("limit", String(params.limit ?? 50));

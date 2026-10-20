@@ -40,8 +40,9 @@
  * because an older unreturned call is more urgent, not less.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import LeadTileDetails from "@/components/campaigns/LeadTileDetails";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
 import {
@@ -73,6 +74,10 @@ const SEARCH_DEBOUNCE_MS = 350;
 
 /** Who the list is showing. "replied" is the broker's definition of a lead. */
 type LeadScope = "replied" | "all";
+
+/** The four headline tiles that open a list of the people they count.
+ *  Reply rate is a ratio, not a list, so it stays a plain card. */
+type HeadlineKey = "waiting" | "leads" | "conversation" | "visits";
 
 // The same tier means something different depending on the scope: among people
 // who wrote back, `low` is close to an opt-out; across everyone, `low` is simply
@@ -107,6 +112,12 @@ export default function LeadsPage() {
   const [stage, setStage] = useState("");
   const [tier, setTier] = useState("");
   const [awaitingOnly, setAwaitingOnly] = useState(false);
+  const [multiReply, setMultiReply] = useState(false);
+  /** Which tile's list is open under the tiles, if any. */
+  const [openTile, setOpenTile] = useState<HeadlineKey | null>(null);
+  /** Bumped after a change the open list must re-read (a lead marked called). */
+  const [detailsVersion, setDetailsVersion] = useState(0);
+  const tableRef = useRef<HTMLDivElement | null>(null);
   const [markingId, setMarkingId] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -149,6 +160,7 @@ export default function LeadsPage() {
           stage: stage || undefined,
           tier: tier || undefined,
           awaitingCallback: awaitingOnly || undefined,
+          multiReply: multiReply || undefined,
           search: search || undefined,
           period,
           limit: PAGE_SIZE,
@@ -160,7 +172,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [scope, stage, tier, awaitingOnly, search, period, offset]);
+  }, [scope, stage, tier, awaitingOnly, multiReply, search, period, offset]);
 
   useEffect(() => {
     void loadSnapshot();
@@ -173,6 +185,7 @@ export default function LeadsPage() {
   const reload = useCallback(() => {
     void loadSnapshot();
     void loadLeads();
+    setDetailsVersion((value) => value + 1);
   }, [loadSnapshot, loadLeads]);
 
   /**
@@ -258,24 +271,32 @@ export default function LeadsPage() {
     const rate = everyone ? Math.round((leads / everyone) * 100) : 0;
     return [
       {
+        key: "leads" as const,
         value: String(leads),
         label: "Leads",
         hint: "Replied on WhatsApp at least once",
+        activeHint: "Listed below — click to close",
       },
       {
+        key: "conversation" as const,
         value: String(values.multi_reply ?? 0),
         label: "In conversation",
         hint: "Wrote back more than once",
+        activeHint: "Listed below — click to close",
       },
       {
+        key: "visits" as const,
         value: String(values["Visit Scheduled"] ?? 0),
         label: "Visits scheduled",
         hint: "Agreed to see a property",
+        activeHint: "Listed below — click to close",
       },
       {
+        key: null,
         value: `${rate}%`,
         label: "Reply rate",
         hint: `${leads} of ${everyone} contact(s) answered`,
+        activeHint: "",
       },
     ];
   }, [snapshot]);
@@ -293,12 +314,44 @@ export default function LeadsPage() {
     setOffset(0);
   };
 
-  const toggleAwaiting = () => {
-    setAwaitingOnly(!awaitingOnly);
-    setOffset(0);
+  /**
+   * Each headline tile opens the list of the people it counts, directly under
+   * the tiles — where the eye already is — with the details that tile is about
+   * (see `LeadTileDetails`). Clicking the same tile again closes it; clicking
+   * another switches to that one.
+   */
+  const toggleTile = (key: HeadlineKey) => {
+    setOpenTile((current) => (current === key ? null : key));
   };
 
-  const filtered = Boolean(stage || tier || search || awaitingOnly);
+  /**
+   * "See all in the table": the same slice applied to the full table, for a
+   * list longer than the panel shows, then scrolled to. The scope follows what
+   * the tile counts — the call list and visits count every contact, the other
+   * two count people who replied — so the table total matches the tile.
+   */
+  const showInTable = (key: HeadlineKey) => {
+    setOffset(0);
+    setTier("");
+    setSearchInput("");
+    setAwaitingOnly(key === "waiting");
+    setMultiReply(key === "conversation");
+    setStage(key === "visits" ? "Visit Scheduled" : "");
+    setScope(key === "waiting" || key === "visits" ? "all" : "replied");
+    setOpenTile(null);
+    requestAnimationFrame(() =>
+      tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  };
+
+  const headlineActive: Record<HeadlineKey, boolean> = {
+    waiting: openTile === "waiting",
+    conversation: openTile === "conversation",
+    visits: openTile === "visits",
+    leads: openTile === "leads",
+  };
+
+  const filtered = Boolean(stage || tier || search || awaitingOnly || multiReply);
 
   return (
     <div>
@@ -387,15 +440,17 @@ export default function LeadsPage() {
       </div>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        {/* First card, and the only one that is also a filter: everyone here was
-            promised a phone call by the assistant, so this is the one number on
-            the page that represents work already owed to a customer. */}
+        {/* First card: everyone here was promised a phone call by the assistant,
+            so this is the one number on the page that represents work already
+            owed to a customer. The other three counts are the same kind of
+            button — click one to list those people. */}
         <button
           type="button"
-          onClick={toggleAwaiting}
-          aria-pressed={awaitingOnly}
+          onClick={() => toggleTile("waiting")}
+          aria-expanded={headlineActive.waiting}
+          aria-controls="lead-tile-details"
           className={`rounded-2xl border p-5 text-left transition ${
-            awaitingOnly
+            headlineActive.waiting
               ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
               : waiting > 0
                 ? "border-amber-300 bg-amber-50 hover:border-amber-400 dark:border-amber-500/40 dark:bg-amber-500/10"
@@ -409,29 +464,74 @@ export default function LeadsPage() {
             Waiting for a call
           </p>
           <p className="mt-1 text-[11px] leading-snug text-gray-400">
-            {awaitingOnly
-              ? "Showing only these — click to show every lead"
+            {headlineActive.waiting
+              ? "Listed below — click to close"
               : waiting > 0
                 ? period === "all"
-                  ? "Agreed to a callback. Click to show only these"
+                  ? "Agreed to a callback — click to see who"
                   : // The one number on this row the period does not touch.
                     "Agreed to a callback — every period, not just this one"
                 : "Nobody is waiting to be phoned"}
           </p>
         </button>
-        {stats.map((card) => (
-          <div
-            key={card.label}
-            className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]"
-          >
-            <p className="text-2xl font-semibold text-gray-800 dark:text-white/90">
-              {card.value}
-            </p>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{card.label}</p>
-            <p className="mt-1 text-[11px] leading-snug text-gray-400">{card.hint}</p>
-          </div>
-        ))}
+        {stats.map((card) => {
+          const active = card.key ? headlineActive[card.key] : false;
+          const className = `rounded-2xl border p-5 text-left transition ${
+            active
+              ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
+              : "border-gray-200 bg-white hover:border-brand-300 dark:border-gray-800 dark:bg-white/[0.03]"
+          }`;
+          const body = (
+            <>
+              <p className="text-2xl font-semibold text-gray-800 dark:text-white/90">
+                {card.value}
+              </p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{card.label}</p>
+              <p className="mt-1 text-[11px] leading-snug text-gray-400">
+                {active ? card.activeHint : card.hint}
+              </p>
+              {card.key && !active ? (
+                <p className="mt-2 text-[11px] font-medium text-brand-500">See who →</p>
+              ) : null}
+            </>
+          );
+          if (!card.key) {
+            return (
+              <div
+                key={card.label}
+                className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]"
+              >
+                {body}
+              </div>
+            );
+          }
+          return (
+            <button
+              key={card.key}
+              type="button"
+              onClick={() => toggleTile(card.key)}
+              aria-expanded={active}
+              aria-controls="lead-tile-details"
+              className={className}
+            >
+              {body}
+            </button>
+          );
+        })}
       </div>
+
+      {openTile ? (
+        <LeadTileDetails
+          tile={openTile}
+          period={period}
+          periodLabel={periodLabel}
+          refreshKey={detailsVersion}
+          marking={markingId}
+          onMarkCalled={markCalled}
+          onShowInTable={showInTable}
+          onClose={() => setOpenTile(null)}
+        />
+      ) : null}
 
       {/* Warmth first: it is the column that decides who gets called today. */}
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -464,7 +564,10 @@ export default function LeadsPage() {
         })}
       </div>
 
-      <div className="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+      <div
+        ref={tableRef}
+        className="scroll-mt-24 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="font-semibold text-gray-900 dark:text-white/90">
@@ -485,12 +588,18 @@ export default function LeadsPage() {
                 Waiting for a call
               </Badge>
             ) : null}
+            {multiReply ? (
+              <Badge color="info" size="sm">
+                In conversation
+              </Badge>
+            ) : null}
             {filtered && (
               <button
                 type="button"
                 onClick={() => {
                   setFilter("", "");
                   setAwaitingOnly(false);
+                  setMultiReply(false);
                   setSearchInput("");
                 }}
                 className="text-xs font-medium text-brand-500 hover:text-brand-600"
@@ -579,9 +688,11 @@ export default function LeadsPage() {
                   <td colSpan={10} className="px-5 py-10 text-center text-gray-500">
                     {awaitingOnly
                       ? "Nobody is waiting for a call right now."
-                      : filtered
-                        ? "No lead matches these filters."
-                        : "No one has replied yet. Once a customer answers on WhatsApp they appear here automatically."}
+                      : multiReply
+                        ? "Nobody has written back more than once."
+                        : filtered
+                          ? "No lead matches these filters."
+                          : "No one has replied yet. Once a customer answers on WhatsApp they appear here automatically."}
                   </td>
                 </tr>
               ) : (
