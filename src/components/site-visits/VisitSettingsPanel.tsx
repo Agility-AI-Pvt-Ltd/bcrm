@@ -23,9 +23,12 @@ type Props = { onSaved?: (settings: VisitSettings) => void };
  */
 export default function VisitSettingsPanel({ onSaved }: Props) {
   const [settings, setSettings] = useState<VisitSettings | null>(null);
+  // Placeholders only — overwritten by the server's own settings the moment
+  // they load. Kept in step with the backend's defaults so the form never
+  // flashes a window the grid does not actually use.
   const [form, setForm] = useState({
-    day_start: "10:00",
-    day_end: "19:00",
+    day_start: "11:00",
+    day_end: "17:00",
     slot_minutes: "60",
     capacity_per_slot: "2",
     min_lead_minutes: "120",
