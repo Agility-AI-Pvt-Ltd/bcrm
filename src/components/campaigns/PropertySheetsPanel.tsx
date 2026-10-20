@@ -15,6 +15,7 @@ import {
   resolveSheetConflicts,
   syncSheetConnection,
   updateSheetConnection,
+  type GoogleCredentialStatus,
   type ManualConflictPolicy,
   type SheetAccessCheck,
   type SheetAnalyze,
@@ -66,6 +67,8 @@ export default function PropertySheetsPanel({ onSynced }: Props) {
   const [connecting, setConnecting] = useState(false);
   const [checking, setChecking] = useState(false);
   const [access, setAccess] = useState<SheetAccessCheck | null>(null);
+  /** Whether this server can read private sheets, and the address to share with. */
+  const [google, setGoogle] = useState<GoogleCredentialStatus | null>(null);
   const [analysis, setAnalysis] = useState<SheetAnalyze | null>(null);
   const [columns, setColumns] = useState<PropertyImportColumn[]>([]);
 
@@ -320,7 +323,7 @@ export default function PropertySheetsPanel({ onSynced }: Props) {
         ) : null}
       </div>
 
-      <GoogleAccountSection />
+      <GoogleAccountSection onStatus={setGoogle} />
 
       {error ? <p className="mb-3 text-sm text-error-500">{error}</p> : null}
       {notice ? <p className="mb-3 text-sm text-success-600">{notice}</p> : null}
@@ -338,7 +341,9 @@ export default function PropertySheetsPanel({ onSynced }: Props) {
                 className={inputClass}
               />
               <span className="mt-1 block text-xs text-gray-400">
-                Share it as “Anyone with the link can view”, then paste it here.
+                {google?.configured && google.client_email
+                  ? `Share it with ${google.client_email} as Viewer (step 1 above), then paste its link here.`
+                  : "Share it as “Anyone with the link can view”, then paste its link here."}
               </span>
             </label>
 
@@ -423,7 +428,9 @@ export default function PropertySheetsPanel({ onSynced }: Props) {
                     {access.worksheets.length} worksheet
                     {access.worksheets.length === 1 ? "" : "s"} found.
                     {access.access === "public"
-                      ? " If you would rather keep it private, share it with the address above and unpublish it."
+                      ? google?.configured
+                        ? " It is readable because it is open to anyone with the link. To keep it private, share it with the address above as Viewer and switch link sharing to Restricted."
+                        : ""
                       : ""}
                   </p>
                 </>
