@@ -16,9 +16,11 @@
  *
  * The list comes from the same query the tile's count does — the leads endpoint
  * with the tile's filter and the selected period — so the number pressed and
- * the rows shown cannot disagree. Visit times are joined on from the visits
- * endpoint by contact, then by phone; a contact marked "Visit Scheduled" with no
- * booked time says so rather than vanishing.
+ * the rows shown cannot disagree. Each person's visits come from
+ * `POST /visits/for-contacts`, ranked upcoming-first then newest missed. It used
+ * to pick one visit here from the first 200, oldest first — which showed
+ * Pooja's missed Saturday slot and hid the visit booked for today. A contact
+ * marked "Visit Scheduled" with no booked time says so rather than vanishing.
  */
 
 import Link from "next/link";
@@ -33,7 +35,7 @@ import {
   type Lead,
   type LeadPeriod,
 } from "@/lib/outreach";
-import { getVisits, type Visit } from "@/lib/siteVisits";
+import { getVisits, getVisitsForContacts, type ContactVisit, type Visit } from "@/lib/siteVisits";
 
 export type TileKey = "waiting" | "leads" | "conversation" | "visits";
 
@@ -66,6 +68,65 @@ function digits(phone: string | null | undefined) {
   return (phone || "").replace(/\D/g, "").slice(-10);
 }
 
+function visitTime(visit: Visit): number | null {
+  if (!visit.scheduled_at) return null;
+  const at = new Date(visit.scheduled_at).getTime();
+  return Number.isFinite(at) ? at : null;
+}
+
+/**
+ * Fallback when `/visits/for-contacts` is not on this API yet: group the
+ * oldest-or-newest dump ourselves. Soonest upcoming first, then newest missed,
+ * never the first row in server order — that hid today's booking behind a
+ * slot they missed last week.
+ */
+function visitsFor(lead: Lead, visits: Visit[]): Visit[] {
+  const phone = digits(lead.phone);
+  const mine = visits.filter(
+    (visit) =>
+      visit.status !== "Cancelled" &&
+      (visit.contact_id === lead.id || (phone && digits(visit.customer_phone) === phone)),
+  );
+  const now = Date.now();
+  return [...mine].sort((left, right) => {
+    const leftAt = visitTime(left);
+    const rightAt = visitTime(right);
+    if (leftAt === null && rightAt === null) return 0;
+    if (leftAt === null) return -1;
+    if (rightAt === null) return 1;
+    const leftLive = leftAt >= now;
+    const rightLive = rightAt >= now;
+    if (leftLive !== rightLive) return leftLive ? -1 : 1;
+    return leftLive ? leftAt - rightAt : rightAt - leftAt;
+  });
+}
+
+async function loadVisitsForLeads(leads: Lead[]): Promise<ContactVisit[]> {
+  try {
+    const found = await getVisitsForContacts(
+      leads.map((lead) => ({ contact_id: lead.id, phone: lead.phone })),
+    );
+    return found.map((item) => ({
+      ...item,
+      visits: item.visits?.length ? item.visits : item.visit ? [item.visit] : [],
+    }));
+  } catch {
+    const list = await getVisits("all", 200);
+    return leads.flatMap((lead) => {
+      const mine = visitsFor(lead, list.items ?? []);
+      if (!mine.length) return [];
+      return [
+        {
+          contact_id: lead.id,
+          visit: mine[0],
+          others: mine.length - 1,
+          visits: mine,
+        },
+      ];
+    });
+  }
+}
+
 function whatsappHref(phone: string | null) {
   const all = (phone || "").replace(/\D/g, "");
   return all.length >= 10 ? `https://wa.me/${all}` : null;
@@ -82,25 +143,6 @@ function filterFor(key: TileKey) {
     default:
       return { replied: true };
   }
-}
-
-/**
- * The visit to show next to a lead: the soonest live one, else the latest.
- * Matched on contact first; phone is the fallback because a visit booked from
- * a chat before the contact existed carries only the number.
- */
-function visitFor(lead: Lead, visits: Visit[]): Visit | null {
-  const phone = digits(lead.phone);
-  const mine = visits.filter(
-    (visit) =>
-      visit.contact_id === lead.id || (phone && digits(visit.customer_phone) === phone),
-  );
-  if (!mine.length) return null;
-  const now = Date.now();
-  const live = mine
-    .filter((visit) => visit.scheduled_at && new Date(visit.scheduled_at).getTime() >= now)
-    .sort((a, b) => String(a.scheduled_at).localeCompare(String(b.scheduled_at)));
-  return live[0] ?? mine[0];
 }
 
 function Score({ score }: { score: number | null }) {
@@ -139,7 +181,7 @@ export default function LeadTileDetails({
 }) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState(0);
-  const [visits, setVisits] = useState<Visit[]>([]);
+  const [visits, setVisits] = useState<Record<string, ContactVisit>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -147,15 +189,12 @@ export default function LeadTileDetails({
     setLoading(true);
     setError("");
     try {
-      const [page, visitList] = await Promise.all([
-        listLeads({ ...filterFor(tile), period, limit: PANEL_LIMIT, offset: 0 }),
-        // Upcoming and past both: a lead marked "Visit Scheduled" whose visit
-        // was this morning should still show when it was.
-        tile === "visits" ? getVisits("all", 200) : Promise.resolve(null),
-      ]);
+      const page = await listLeads({ ...filterFor(tile), period, limit: PANEL_LIMIT, offset: 0 });
+      const found =
+        tile === "visits" && page.items.length ? await loadVisitsForLeads(page.items) : [];
       setLeads(page.items);
       setTotal(page.total);
-      setVisits(visitList?.items ?? []);
+      setVisits(Object.fromEntries(found.map((item) => [item.contact_id, item])));
     } catch (problem) {
       setError(problem instanceof ApiError ? problem.message : "Could not load this list.");
     } finally {
@@ -231,7 +270,7 @@ export default function LeadTileDetails({
               key={lead.id}
               tile={tile}
               lead={lead}
-              visit={tile === "visits" ? visitFor(lead, visits) : null}
+              visit={tile === "visits" ? (visits[lead.id] ?? null) : null}
               marking={marking === lead.id}
               onMarkCalled={onMarkCalled}
             />
@@ -257,21 +296,23 @@ export default function LeadTileDetails({
 function DetailRow({
   tile,
   lead,
-  visit,
+  visit: entry,
   marking,
   onMarkCalled,
 }: {
   tile: TileKey;
   lead: Lead;
-  visit: Visit | null;
+  visit: ContactVisit | null;
   marking: boolean;
   onMarkCalled: (lead: Lead) => void;
 }) {
+  const listed =
+    entry?.visits?.length ? entry.visits : entry?.visit ? [entry.visit] : [];
   const chat = whatsappHref(lead.phone);
   const wants = [lead.bhk, lead.preferred_location, lead.budget_label].filter(Boolean).join(" · ");
 
   return (
-    <li className="grid grid-cols-1 gap-3 px-5 py-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] sm:items-center">
+    <li className="grid grid-cols-1 gap-3 px-5 py-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] sm:items-start">
       <div className="min-w-0">
         <p className="truncate font-medium text-gray-800 dark:text-white/90">
           {lead.name || "Unnamed"}
@@ -292,17 +333,26 @@ function DetailRow({
 
       <div className="min-w-0 text-sm">
         {tile === "visits" ? (
-          visit ? (
-            <>
-              <p className="font-medium text-gray-800 dark:text-white/90">
-                {visit.view.when_label || formatWhen(visit.scheduled_at)}
-              </p>
-              <p className="truncate text-xs text-gray-500">
-                {[visit.property_title, visit.property_location].filter(Boolean).join(" · ") ||
-                  "No property named"}
-                {visit.assigned_name ? ` · with ${visit.assigned_name}` : ""}
-              </p>
-            </>
+          listed.length ? (
+            <ul className="space-y-2">
+              {listed.map((visit) => (
+                <li key={visit.id} className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 dark:text-white/90">
+                      {visit.view.when_label || formatWhen(visit.scheduled_at)}
+                    </p>
+                    <p className="truncate text-xs text-gray-500">
+                      {[visit.property_title, visit.property_location].filter(Boolean).join(" · ") ||
+                        "No property named"}
+                      {visit.assigned_name ? ` · with ${visit.assigned_name}` : ""}
+                    </p>
+                  </div>
+                  <Badge color={TONE_BADGE[visit.view.tone] ?? "light"} size="sm">
+                    {visit.view.label || visit.status}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
           ) : (
             <p className="text-xs text-gray-500">
               Agreed to a visit — no time booked yet
@@ -333,11 +383,7 @@ function DetailRow({
       </div>
 
       <div className="flex items-center gap-2 sm:justify-end">
-        {tile === "visits" && visit ? (
-          <Badge color={TONE_BADGE[visit.view.tone] ?? "light"} size="sm">
-            {visit.view.label || visit.status}
-          </Badge>
-        ) : (
+        {tile === "visits" ? null : (
           <Score score={lead.intent_score} />
         )}
         {tile === "waiting" && lead.callback_requested_at ? (

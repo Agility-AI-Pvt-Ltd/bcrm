@@ -227,6 +227,27 @@ export type TeamMember = { id: string; name: string };
 
 export const getVisitTeam = () => apiFetch<TeamMember[]>(`${BASE}/team`);
 
+/** One contact's visits, ranked on the server by the same rule everywhere. */
+export type ContactVisit = {
+  contact_id: string;
+  visit: Visit;
+  /** Other visits this customer has, not counting cancelled ones. */
+  others: number;
+  /** Every live visit, soonest upcoming then newest missed. */
+  visits?: Visit[];
+};
+
+/**
+ * The visit to show beside each contact. Use this instead of fetching visits and
+ * picking one in the browser — that is how the Leads page showed a missed
+ * Saturday slot while Site Visits showed the visit booked for today.
+ */
+export const getVisitsForContacts = (contacts: { contact_id: string; phone: string | null }[]) =>
+  apiFetch<ContactVisit[]>(`${BASE}/for-contacts`, {
+    method: "POST",
+    body: JSON.stringify({ contacts }),
+  });
+
 export const assignVisit = (id: string, assignedTo: string | null) =>
   apiFetch<VisitDetail>(`${BASE}/${id}/assign`, {
     method: "POST",
