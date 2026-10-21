@@ -26,6 +26,7 @@ import { useSearchParams } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ChatPanel from "@/components/messages/ChatPanel";
 import CustomerDetailsPanel from "@/components/messages/CustomerDetailsPanel";
+import FilteredMessagesPanel from "@/components/messages/FilteredMessagesPanel";
 import MessageFilters from "@/components/messages/MessageFilters";
 import ThreadList from "@/components/messages/ThreadList";
 import { FIELD, LABEL } from "@/components/messages/tokens";
@@ -371,6 +372,8 @@ export default function MessagesWorkspace() {
         </button>
       </div>
 
+      <FilteredMessagesPanel onReleased={() => void loadThreads()} />
+
       {/* One strip rather than six floating cards, split by hairlines. The rules
           are the 1px parent background showing through a `gap-px` grid, which is
           the only way they stay clean at every breakpoint the grid wraps at. */}
@@ -545,6 +548,11 @@ export default function MessagesWorkspace() {
         {showDetails && detail && (
           <div className="hidden max-h-[calc(100vh-13rem)] min-h-[32rem] flex-col overflow-y-auto rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03] xl:flex">
             <CustomerDetailsPanel
+              conversationId={detail.thread.conversation_id}
+              onChanged={() => {
+                void openThread(detail.thread.conversation_id);
+                void loadThreads();
+              }}
               profile={detail.profile}
               interest={detail.interest}
               qualification={detail.qualification}

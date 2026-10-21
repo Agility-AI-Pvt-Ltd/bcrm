@@ -589,3 +589,37 @@ export const INBOX_COUNT_LABELS: Record<string, string> = {
   scheduled: "Has a date",
   replied: "Replied",
 };
+
+// --- quick actions beside a chat ---------------------------------------------
+
+/** What changed on the CRM contact behind the chat. */
+export type ConversationActionResult = {
+  contact_id: string;
+  customer_stage: string;
+  engagement_tier: string;
+  assigned_to: string | null;
+  outreach_paused: boolean;
+  message: string;
+};
+
+export async function setConversationStage(conversationId: string, stage: string) {
+  return apiFetch<ConversationActionResult>(`/api/v1/conversations/${conversationId}/stage`, {
+    method: "POST",
+    body: JSON.stringify({ stage }),
+  });
+}
+
+/** `userId` null takes the lead off everyone. */
+export async function reassignConversation(conversationId: string, userId: string | null) {
+  return apiFetch<ConversationActionResult>(`/api/v1/conversations/${conversationId}/assign`, {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId }),
+  });
+}
+
+export async function optOutConversation(conversationId: string, reason?: string) {
+  return apiFetch<ConversationActionResult>(`/api/v1/conversations/${conversationId}/opt-out`, {
+    method: "POST",
+    body: JSON.stringify({ reason: reason || null }),
+  });
+}
