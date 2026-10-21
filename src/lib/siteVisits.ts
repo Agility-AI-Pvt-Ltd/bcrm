@@ -264,6 +264,9 @@ export const createVisit = (payload: {
   slot_id?: string | null;
   property_id?: string | null;
   notes?: string | null;
+  /** Ties the visit to the CRM contact and the chat it was booked from. */
+  contact_id?: string | null;
+  conversation_id?: string | null;
 }) => apiFetch<VisitDetail>(BASE, { method: "POST", body: JSON.stringify(payload) });
 
 const action = (id: string, path: string, body?: unknown) =>

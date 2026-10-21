@@ -18,6 +18,7 @@
  */
 
 import { useState, type ReactNode } from "react";
+import QuickActions from "@/components/messages/QuickActions";
 import Badge from "@/components/ui/badge/Badge";
 import {
   BAND_HINTS,
@@ -34,6 +35,10 @@ import {
 } from "@/components/messages/tokens";
 
 type Props = {
+  /** The chat these actions apply to. */
+  conversationId: string;
+  /** Re-read the chat after an action changed the customer. */
+  onChanged: () => void;
   profile: CustomerProfile;
   interest: InterestAssessment;
   qualification: Record<string, unknown>;
@@ -80,6 +85,8 @@ function Accordion({ title, defaultOpen = true, children }: { title: string, def
 }
 
 export default function CustomerDetailsPanel({
+  conversationId,
+  onChanged,
   profile,
   interest,
   qualification,
@@ -231,20 +238,12 @@ export default function CustomerDetailsPanel({
 
       <div className="shrink-0 border-t border-gray-100 p-5 dark:border-gray-800 bg-gray-50/50 dark:bg-white/[0.02]">
         <h4 className="text-[10px] font-bold uppercase text-gray-400 mb-3">Quick Actions</h4>
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-            Schedule Visit
-          </button>
-          <button type="button" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-            Update Stage
-          </button>
-          <button type="button" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-xs transition hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-            Reassign
-          </button>
-          <button type="button" className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-error-600 shadow-xs transition hover:bg-error-50 dark:border-gray-700 dark:bg-gray-800 dark:text-error-400 dark:hover:bg-error-900/20">
-            Opt Out
-          </button>
-        </div>
+        <QuickActions
+          conversationId={conversationId}
+          profile={profile}
+          qualification={qualification}
+          onChanged={onChanged}
+        />
       </div>
     </div>
   );
