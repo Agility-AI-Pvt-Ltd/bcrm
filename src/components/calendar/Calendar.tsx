@@ -192,11 +192,13 @@ export default function Calendar() {
     if (!pending) return;
     setBusy(true);
     try {
-      await rescheduleVisit(pending.visit.id, pending.slot.slot_id);
+      const moved = await rescheduleVisit(pending.visit.id, pending.slot.slot_id);
+      // Say what actually happened to the customer — told on WhatsApp, or
+      // outside the 24-hour window and needing a call — not what we hoped.
       setNotice(
         `Moved to ${pending.slot.label}. ${
-          pending.visit.customer_name || "The customer"
-        } has been told on WhatsApp.`,
+          moved.customer_notice?.message ?? "Let the customer know the new time."
+        }`,
       );
       setPending(null);
       await load();
