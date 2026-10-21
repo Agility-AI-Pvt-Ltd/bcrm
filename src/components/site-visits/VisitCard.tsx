@@ -509,7 +509,13 @@ export default function VisitCard({
                 className={primary}
                 disabled={busy !== "" || !slot}
                 onClick={() =>
-                  void run("move", () => rescheduleVisit(current.id, slot), "Moved — reminders reset.")
+                  void run("move", async () => {
+                    const moved = await rescheduleVisit(current.id, slot);
+                    setNotice(
+                      `Moved — reminders reset. ${moved.customer_notice?.message ?? ""}`.trim(),
+                    );
+                    return moved;
+                  })
                 }
               >
                 Move

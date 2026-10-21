@@ -119,9 +119,21 @@ export type Visit = {
   view: VisitView;
 };
 
+/**
+ * Returned by a reschedule: whether the customer was told the new time on
+ * WhatsApp. Outside the 24-hour window WhatsApp forbids free text, and
+ * `message` tells the agent to call or message them instead.
+ */
+export type CustomerNotice = {
+  sent: boolean;
+  reason: string;
+  message: string;
+};
+
 export type VisitDetail = Visit & {
   timeline: VisitEvent[];
   slots: VisitSlot[];
+  customer_notice?: CustomerNotice | null;
 };
 
 export type VisitList = {

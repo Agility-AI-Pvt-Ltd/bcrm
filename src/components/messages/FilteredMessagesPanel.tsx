@@ -46,9 +46,13 @@ export default function FilteredMessagesPanel({
       const page = await listFilteredMessages("held");
       setItems(page.items);
       setHeld(page.held);
-      setError("");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load filtered messages.");
+    } catch {
+      // Silent on purpose. This panel is a side note on the Messages page, not
+      // the page itself: if the list cannot be read — a backend that does not
+      // have the filter yet answers 404 — the panel simply does not appear,
+      // rather than putting an error above every conversation.
+      setItems([]);
+      setHeld(0);
     }
   }, []);
 
@@ -77,7 +81,10 @@ export default function FilteredMessagesPanel({
     }
   };
 
-  if (!held && !notice && !error) {
+  // Only when something is actually waiting for review. "0 messages not
+  // answered" is not news, and the release confirmation is not worth a panel of
+  // its own once the list is empty.
+  if (!held) {
     return null;
   }
 
