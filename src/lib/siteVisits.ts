@@ -155,6 +155,8 @@ export type VisitSettings = {
   auto_confirm: boolean;
   reminder_24h: boolean;
   reminder_2h: boolean;
+  /** How long before the visit the near reminder (with the pin) goes out. */
+  reminder_lead_minutes: number;
   send_pin_with_reminder: boolean;
   ask_for_feedback: boolean;
   feedback_delay_minutes: number;
@@ -162,6 +164,12 @@ export type VisitSettings = {
   reminder_template_status: string;
   feedback_template_status: string;
 };
+
+export const REMINDER_LEAD_CHOICES = [
+  { minutes: 30, label: "30 minutes before" },
+  { minutes: 60, label: "1 hour before" },
+  { minutes: 120, label: "2 hours before" },
+] as const;
 
 export type VisitSettingsUpdate = Partial<
   Omit<VisitSettings, "warnings" | "reminder_template_status" | "feedback_template_status">

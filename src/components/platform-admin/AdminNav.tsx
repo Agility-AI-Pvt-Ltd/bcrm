@@ -22,6 +22,7 @@ const LINKS: Array<{ href: string; label: string }> = [
   { href: "/admin", label: "Accounts" },
   { href: "/admin/spend", label: "Spend" },
   { href: "/admin/rates", label: "Rates" },
+  { href: "/admin/developers", label: "Developers" },
 ];
 
 export default function AdminNav() {

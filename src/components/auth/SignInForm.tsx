@@ -1,11 +1,19 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import DeveloperSignIn from "@/components/auth/DeveloperSignIn";
 import Checkbox from "@/components/form/input/Checkbox";
 import Input from "@/components/form/input/InputField";
 import Label from "@/components/form/Label";
 import { EyeCloseIcon, EyeIcon } from "@/icons";
-import { ApiError, getAccessToken, getStoredUser, loginAccount } from "@/lib/auth";
+import {
+  ApiError,
+  getAccessToken,
+  getStoredUser,
+  loginAccount,
+  requestDeveloperCode,
+  verifyDeveloperCode,
+} from "@/lib/auth";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -15,6 +23,8 @@ export default function SignInForm() {
   const [isChecked, setIsChecked] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Developers do not use the agent's password: they get a code by email.
+  const [developer, setDeveloper] = useState(false);
 
   // Already signed in: skip the form. Enabled accounts land on the leads list,
   // which is what "home" means everywhere in this app.
@@ -63,9 +73,38 @@ export default function SignInForm() {
               Sign In
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your email and password to sign in.
+              {developer
+                ? "Open an agent's account with a code sent to your developer email."
+                : "Enter your email and password to sign in."}
             </p>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={developer}
+              onClick={() => {
+                setDeveloper((value) => !value);
+                setError("");
+              }}
+              className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                developer
+                  ? "border-brand-500 bg-brand-500 text-white"
+                  : "border-gray-300 text-gray-600 hover:border-brand-400 hover:text-brand-600 dark:border-gray-700 dark:text-gray-300"
+              }`}
+            >
+              <span
+                aria-hidden
+                className={`inline-block h-2 w-2 rounded-full ${developer ? "bg-white" : "bg-gray-400"}`}
+              />
+              I&apos;m a developer
+            </button>
           </div>
+          {developer ? (
+            <DeveloperSignIn
+              requestCode={requestDeveloperCode}
+              verifyCode={verifyDeveloperCode}
+              onSignedIn={(enabled) => router.push(enabled ? "/leads" : "/plans")}
+            />
+          ) : (
           <form onSubmit={(event) => void onSubmit(event)}>
             <div className="space-y-6">
               <div>
@@ -116,6 +155,7 @@ export default function SignInForm() {
               </div>
             </div>
           </form>
+          )}
 
           <div className="mt-5">
             <p className="text-center text-sm font-normal text-gray-700 sm:text-start dark:text-gray-400">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { failureText } from "@/lib/api";
 import {
   getVisitSettings,
+  REMINDER_LEAD_CHOICES,
   saveVisitSettings,
   WEEKDAY_LABELS,
   type VisitSettings,
@@ -15,6 +16,13 @@ const input =
 const label = "mb-1.5 block text-sm font-medium text-gray-800 dark:text-white/90";
 
 type Props = { onSaved?: (settings: VisitSettings) => void };
+
+const leadLabel = (minutes: number | undefined): string => {
+  const value = minutes ?? 60;
+  if (value < 60) return `${value} minutes`;
+  const hours = value / 60;
+  return Number.isInteger(hours) ? `${hours} hour${hours === 1 ? "" : "s"}` : `${value} minutes`;
+};
 
 /**
  * The grid the AI books against, and what goes out around a visit. Everything the
@@ -298,7 +306,30 @@ export default function VisitSettingsPanel({ onSaved }: Props) {
             "Off means every visit waits for you to accept it.",
           )}
           {toggle("reminder_24h", "Remind the day before", "Gives them time to rearrange.")}
-          {toggle("reminder_2h", "Remind 2 hours before", "When people actually set off.")}
+          <div className="flex flex-col gap-2">
+            {toggle(
+              "reminder_2h",
+              `Remind ${leadLabel(settings.reminder_lead_minutes)} before`,
+              "When people actually set off. Sent once, timed from the booked slot.",
+            )}
+            <label className="ml-7 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+              Send it
+              <select
+                value={settings.reminder_lead_minutes ?? 60}
+                disabled={saving || !settings.reminder_2h}
+                onChange={(event) =>
+                  void save({ reminder_lead_minutes: Number(event.target.value) }, "Reminder time saved.")
+                }
+                className="rounded-lg border border-gray-300 bg-transparent px-2 py-1 text-xs text-gray-700 disabled:opacity-50 dark:border-gray-700 dark:text-gray-200"
+              >
+                {REMINDER_LEAD_CHOICES.map((choice) => (
+                  <option key={choice.minutes} value={choice.minutes}>
+                    {choice.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           {toggle(
             "send_pin_with_reminder",
             "Send the location with that reminder",
