@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ApiError,
+  clearSession,
   fetchMe,
   getAccessToken,
   getStoredUser,
@@ -52,12 +54,20 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       try {
         const me = await fetchMe();
         if (!cancelled) setGate({ state: "known", user: me });
-      } catch {
+      } catch (err) {
         if (cancelled) return;
+        const cached = getStoredUser();
+        // A developer session the admin has ended answers 401. Unlike a flaky
+        // network, that is a definite "no": leave rather than keep showing the
+        // agency's data from the cache.
+        if (cached?.acting_developer && err instanceof ApiError && err.status === 401) {
+          clearSession();
+          setGate({ state: "guest" });
+          return;
+        }
         // The API is unreachable or the token is stale. Fall back to the cached
         // user so a flaky network does not sign everyone out — but a cached user
         // is still put through the same check below.
-        const cached = getStoredUser();
         setGate(cached ? { state: "known", user: cached } : { state: "guest" });
       }
     };

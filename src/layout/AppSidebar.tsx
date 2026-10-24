@@ -59,6 +59,29 @@ const navItems: NavItem[] = [
     name: "Properties",
     path: "/properties",
   },
+  // Site visits are the one thing in this product that happens in the physical
+  // world, and the day a broker has is organised around them — so they sit above
+  // the calendar rather than inside it. The two are views of the same visits:
+  // the list for working through them, the grid for seeing the week.
+  {
+    icon: <MapPinIcon />,
+    name: "Site Visits",
+    path: "/site-visits",
+  },
+  // The one message EstateFlow sends its own team rather than a customer: each
+  // agent's morning summary, on their personal WhatsApp. Top-level because it is
+  // the first thing a broker reads each day, and because the number it goes to is
+  // set here — not buried in a settings tab.
+  {
+    icon: <PieChartIcon />,
+    name: "Daily Digest",
+    path: "/daily-digest",
+  },
+  {
+    icon: <CalenderIcon />,
+    name: "Visit calendar",
+    path: "/calendar",
+  },
   {
     icon: <ShootingStarIcon />,
     name: "Campaign Studio",
@@ -76,20 +99,6 @@ const navItems: NavItem[] = [
     name: "Notifications",
     path: "/notifications",
   },
-  // Site visits are the one thing in this product that happens in the physical
-  // world, and the day a broker has is organised around them — so they sit above
-  // the calendar rather than inside it. The two are views of the same visits:
-  // the list for working through them, the grid for seeing the week.
-  {
-    icon: <MapPinIcon />,
-    name: "Site Visits",
-    path: "/site-visits",
-  },
-  {
-    icon: <CalenderIcon />,
-    name: "Visit calendar",
-    path: "/calendar",
-  },
   // Not a campaign step either: a lead can go quiet weeks after the campaign
   // that first messaged it finished, and still needs following up. It runs on
   // its own schedule, so it gets its own entry rather than living under
@@ -106,15 +115,6 @@ const navItems: NavItem[] = [
     icon: <PhoneCallIcon />,
     name: "AI Callback",
     path: "/ai-callback",
-  },
-  // The one message EstateFlow sends its own team rather than a customer: each
-  // agent's morning summary, on their personal WhatsApp. Top-level because it is
-  // the first thing a broker reads each day, and because the number it goes to is
-  // set here — not buried in a settings tab.
-  {
-    icon: <PieChartIcon />,
-    name: "Daily Digest",
-    path: "/daily-digest",
   },
   // Where the money went. Top-level because "which portal should I cancel?" is a
   // question a broker asks every month and could not answer at all before.

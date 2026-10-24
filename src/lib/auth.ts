@@ -21,6 +21,17 @@ export type AuthUser = {
   is_enabled: boolean;
   is_active: boolean;
   created_at?: string | null;
+  /** Set when a developer opened this account with an emailed code, not the
+   * agent with their password. The app shows a banner while it is set. */
+  acting_developer?: ActingDeveloper | null;
+};
+
+export type ActingDeveloper = { id: string; email: string; name?: string };
+
+export type DeveloperCodeSent = {
+  message: string;
+  expires_in_seconds: number;
+  retry_after_seconds: number;
 };
 
 export type TokenResponse = {
@@ -270,6 +281,32 @@ export async function registerAccount(payload: {
 
 export async function loginAccount(payload: { email: string; password: string }) {
   const data = await apiFetch<TokenResponse>("/api/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  persistSession(data.access_token, data.user);
+  return data;
+}
+
+/** Developer sign-in, step 1: email a code to the developer (via Brevo).
+ * The answer is the same whether or not the developer may open the account. */
+export async function requestDeveloperCode(payload: {
+  account_email: string;
+  developer_email: string;
+}) {
+  return apiFetch<DeveloperCodeSent>("/api/v1/auth/developer/request-code", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** Developer sign-in, step 2: the emailed code opens the agent's account. */
+export async function verifyDeveloperCode(payload: {
+  account_email: string;
+  developer_email: string;
+  code: string;
+}) {
+  const data = await apiFetch<TokenResponse>("/api/v1/auth/developer/verify", {
     method: "POST",
     body: JSON.stringify(payload),
   });

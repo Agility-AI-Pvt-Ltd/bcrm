@@ -269,7 +269,7 @@ export default function VisitCard({
             </span>
             <span className="block">
               <span className={current.reminder_2h_sent_at ? "text-success-600" : "text-gray-500"}>
-                {current.reminder_2h_sent_at ? "✓" : "○"} 2 hours before
+                {current.reminder_2h_sent_at ? "✓" : "○"} near the time
               </span>
             </span>
           </span>

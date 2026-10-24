@@ -401,3 +401,84 @@ export function quantity(value: string | null | undefined): string {
   if (!Number.isFinite(amount)) return String(value);
   return amount.toLocaleString("en-IN", { maximumFractionDigits: 2 });
 }
+
+// --- developers ----------------------------------------------------------------
+//
+// Who may open an agent's account with an emailed code (sent through Brevo), and
+// which accounts. Only an operator can change this list.
+
+export type DeveloperAccount = {
+  user_id: string;
+  email: string;
+  name: string;
+  organization_id?: string | null;
+  organization_name?: string | null;
+  granted_at?: string | null;
+};
+
+export type DeveloperAccessEvent = {
+  event: string;
+  account_email: string;
+  organization_name?: string | null;
+  ip_address?: string | null;
+  detail?: string | null;
+  at: string;
+};
+
+export type Developer = {
+  id: string;
+  email: string;
+  name: string;
+  is_active: boolean;
+  all_accounts: boolean;
+  last_login_at?: string | null;
+  created_at?: string | null;
+  accounts: DeveloperAccount[];
+  recent: DeveloperAccessEvent[];
+};
+
+export async function listDevelopers(): Promise<Developer[]> {
+  return adminFetch<Developer[]>("/api/v1/admin/developers");
+}
+
+export async function createDeveloper(input: {
+  email: string;
+  name?: string;
+  all_accounts?: boolean;
+  account_emails?: string[];
+}): Promise<Developer> {
+  return adminFetch<Developer>("/api/v1/admin/developers", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateDeveloper(
+  developerId: string,
+  input: { name?: string; is_active?: boolean; all_accounts?: boolean },
+): Promise<Developer> {
+  return adminFetch<Developer>(`/api/v1/admin/developers/${encodeURIComponent(developerId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function grantDeveloperAccount(
+  developerId: string,
+  accountEmail: string,
+): Promise<Developer> {
+  return adminFetch<Developer>(
+    `/api/v1/admin/developers/${encodeURIComponent(developerId)}/accounts`,
+    { method: "POST", body: JSON.stringify({ account_email: accountEmail }) },
+  );
+}
+
+export async function revokeDeveloperAccount(
+  developerId: string,
+  userId: string,
+): Promise<Developer> {
+  return adminFetch<Developer>(
+    `/api/v1/admin/developers/${encodeURIComponent(developerId)}/accounts/${encodeURIComponent(userId)}`,
+    { method: "DELETE" },
+  );
+}
