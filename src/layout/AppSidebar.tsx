@@ -82,6 +82,14 @@ const navItems: NavItem[] = [
     name: "Visit calendar",
     path: "/calendar",
   },
+  // Deliberately top-level, not inside Campaign Studio: notifications span every
+  // campaign, and burying them a click deep defeats the point of a shortcut. The
+  // bell matches the one in the header so both read as the same destination.
+  {
+    icon: <BellIcon />,
+    name: "Notifications",
+    path: "/notifications",
+  },
   {
     icon: <ShootingStarIcon />,
     name: "Campaign Studio",
@@ -90,14 +98,6 @@ const navItems: NavItem[] = [
       { name: "Campaigns", path: "/campaigns", pro: false },
       { name: "Contacts", path: "/contacts", pro: false },
     ],
-  },
-  // Deliberately top-level, not inside Campaign Studio: notifications span every
-  // campaign, and burying them a click deep defeats the point of a shortcut. The
-  // bell matches the one in the header so both read as the same destination.
-  {
-    icon: <BellIcon />,
-    name: "Notifications",
-    path: "/notifications",
   },
   // Not a campaign step either: a lead can go quiet weeks after the campaign
   // that first messaged it finished, and still needs following up. It runs on
