@@ -25,6 +25,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import CustomerProfileDrawer from "@/components/campaigns/CustomerProfileDrawer";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
 import { bandBadgeColor, interestBand, interestLabel } from "@/lib/inbox";
@@ -184,6 +185,8 @@ export default function LeadTileDetails({
   const [visits, setVisits] = useState<Record<string, ContactVisit>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // The customer whose profile is open in the side drawer.
+  const [profileOf, setProfileOf] = useState<Lead | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -206,14 +209,17 @@ export default function LeadTileDetails({
     void load();
   }, [load, refreshKey]);
 
-  // Escape closes, the way any panel that opened on a click should.
+  // Escape closes, the way any panel that opened on a click should — the open
+  // customer profile first, then this list.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (profileOf) setProfileOf(null);
+      else onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, profileOf]);
 
   const scopeNote =
     tile === "waiting"
@@ -273,6 +279,7 @@ export default function LeadTileDetails({
               visit={tile === "visits" ? (visits[lead.id] ?? null) : null}
               marking={marking === lead.id}
               onMarkCalled={onMarkCalled}
+              onOpen={setProfileOf}
             />
           ))}
         </ul>
@@ -289,6 +296,15 @@ export default function LeadTileDetails({
           </button>
         </div>
       ) : null}
+
+      {profileOf ? (
+        <CustomerProfileDrawer
+          key={profileOf.id}
+          lead={profileOf}
+          onClose={() => setProfileOf(null)}
+          onChanged={() => void load()}
+        />
+      ) : null}
     </section>
   );
 }
@@ -299,12 +315,15 @@ function DetailRow({
   visit: entry,
   marking,
   onMarkCalled,
+  onOpen,
 }: {
   tile: TileKey;
   lead: Lead;
   visit: ContactVisit | null;
   marking: boolean;
   onMarkCalled: (lead: Lead) => void;
+  /** Open this customer's profile (the Messages page's panel) in a drawer. */
+  onOpen: (lead: Lead) => void;
 }) {
   const listed =
     entry?.visits?.length ? entry.visits : entry?.visit ? [entry.visit] : [];
@@ -312,13 +331,27 @@ function DetailRow({
   const wants = [lead.bhk, lead.preferred_location, lead.budget_label].filter(Boolean).join(" · ");
 
   return (
-    <li className="grid grid-cols-1 gap-3 px-5 py-3 sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] sm:items-start">
+    <li
+      role="button"
+      tabIndex={0}
+      title="Open customer profile"
+      onClick={() => onOpen(lead)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(lead);
+        }
+      }}
+      className="grid cursor-pointer grid-cols-1 gap-3 px-5 py-3 transition hover:bg-gray-50 focus:bg-gray-50 focus:outline-none sm:grid-cols-[minmax(0,12rem)_minmax(0,1fr)_auto] sm:items-start dark:hover:bg-white/[0.03] dark:focus:bg-white/[0.03]"
+    >
       <div className="min-w-0">
-        <p className="truncate font-medium text-gray-800 dark:text-white/90">
+        <p className="truncate font-medium text-brand-600 dark:text-brand-400">
           {lead.name || "Unnamed"}
         </p>
         {chat ? (
           <a
+            onClick={(event) => event.stopPropagation()}
             href={chat}
             target="_blank"
             rel="noopener noreferrer"
@@ -390,7 +423,10 @@ function DetailRow({
           <button
             type="button"
             disabled={marking}
-            onClick={() => onMarkCalled(lead)}
+            onClick={(event) => {
+              event.stopPropagation();
+              onMarkCalled(lead);
+            }}
             className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
           >
             {marking ? "Saving…" : "Mark called"}

@@ -432,6 +432,14 @@ export async function listThreads(
   return apiFetch<InboxThreadPage>(`/api/v1/conversations?${query}`);
 }
 
+/** The Messages page's customer panel, for a contact from the Leads page:
+ * their newest chat's detail. 404 when they have no WhatsApp chat yet. */
+export async function getThreadForContact(contactId: string) {
+  return apiFetch<InboxThreadDetail>(
+    `/api/v1/conversations/for-contact/${encodeURIComponent(contactId)}`,
+  );
+}
+
 export async function getThread(conversationId: string) {
   return apiFetch<InboxThreadDetail>(
     `/api/v1/conversations/${encodeURIComponent(conversationId)}`,
