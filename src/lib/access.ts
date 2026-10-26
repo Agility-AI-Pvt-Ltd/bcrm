@@ -34,3 +34,46 @@ export function isAllowedWhenDisabled(pathname: string): boolean {
 export function isAwaitingVerification(user: { is_enabled: boolean } | null): boolean {
   return user !== null && !user.is_enabled;
 }
+
+/**
+ * The parts of the workspace a real-estate agent can open. Everything else stays
+ * in the sidebar, faded, and does not open — not from the menu and not from a
+ * typed URL or an in-page link (`AuthGate` shows a "not available" panel).
+ *
+ * A prefix list: `/properties/list`, `/profile/availability` and the like are
+ * part of the page they sit under. `/plans` is always reachable, because a
+ * lapsed account must be able to pick a plan.
+ *
+ * A developer session (a developer the platform admin let into this account) is
+ * not limited by this list: they are there to debug the whole workspace.
+ *
+ * This is what stops a page being drawn. The data behind the pages agents keep
+ * is shared with the ones they don't, so the API is not filtered by it.
+ */
+export const AGENT_PATHS = [
+  "/leads",
+  "/messages",
+  "/properties",
+  "/site-visits",
+  "/daily-digest",
+  "/calendar",
+  "/notifications",
+  "/profile",
+] as const;
+
+const ALWAYS_OPEN = ["/plans"];
+
+function underAny(pathname: string, roots: readonly string[]): boolean {
+  return roots.some((root) => pathname === root || pathname.startsWith(`${root}/`));
+}
+
+/** May this user open this page? */
+export function canOpen(
+  pathname: string,
+  user: { acting_developer?: unknown } | null,
+): boolean {
+  if (user?.acting_developer) return true;
+  return underAny(pathname, AGENT_PATHS) || underAny(pathname, ALWAYS_OPEN);
+}
+
+export const NOT_AVAILABLE_HINT = "Not available on your account";

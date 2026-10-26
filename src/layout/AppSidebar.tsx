@@ -23,7 +23,7 @@ import {
   UserCircleIcon,
 } from "../icons/index";
 import { useStoredUser } from "@/hooks/useStoredUser";
-import { isAwaitingVerification } from "@/lib/access";
+import { canOpen, isAwaitingVerification, NOT_AVAILABLE_HINT } from "@/lib/access";
 
 type NavItem = {
   name: string;
@@ -165,7 +165,16 @@ const navItems: NavItem[] = [
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
-  const awaitingVerification = isAwaitingVerification(useStoredUser());
+  const storedUser = useStoredUser();
+  const awaitingVerification = isAwaitingVerification(storedUser);
+  // Sections an agent does not have stay in the menu, faded, and do not open.
+  const locked = useCallback(
+    (nav: NavItem) => {
+      const paths = nav.path ? [nav.path] : (nav.subItems || []).map((item) => item.path);
+      return paths.length > 0 && paths.every((path) => !canOpen(path, storedUser));
+    },
+    [storedUser],
+  );
 
   // Which group the current URL lives in. Derived during render instead of
   // pushed into state from an effect, so navigating costs one render, not two.
@@ -207,7 +216,20 @@ const AppSidebar: React.FC = () => {
     <ul className="flex flex-col gap-4">
       {items.map((nav, index) => (
         <li key={nav.name}>
-          {nav.subItems ? (
+          {locked(nav) ? (
+            <span
+              aria-disabled="true"
+              title={NOT_AVAILABLE_HINT}
+              className={`menu-item menu-item-inactive cursor-not-allowed opacity-40 select-none ${
+                !isExpanded && !isHovered ? "lg:justify-center" : "lg:justify-start"
+              }`}
+            >
+              <span className="menu-item-icon-inactive">{nav.icon}</span>
+              {(isExpanded || isHovered || isMobileOpen) && (
+                <span className="menu-item-text">{nav.name}</span>
+              )}
+            </span>
+          ) : nav.subItems ? (
             <button
               onClick={() => handleSubmenuToggle(index)}
               className={`menu-item group  ${
@@ -273,7 +295,7 @@ const AppSidebar: React.FC = () => {
               </Link>
             )
           )}
-          {nav.subItems && (isExpanded || isHovered || isMobileOpen) && (
+          {nav.subItems && !locked(nav) && (isExpanded || isHovered || isMobileOpen) && (
             <div
               ref={(el) => {
                 subMenuRefs.current[index] = el;

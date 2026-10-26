@@ -1,6 +1,7 @@
 "use client";
 
 import { useSidebar } from "@/context/SidebarContext";
+import AgentRouteGuard from "@/components/auth/AgentRouteGuard";
 import AuthGate from "@/components/auth/AuthGate";
 import DeveloperSessionBanner from "@/components/auth/DeveloperSessionBanner";
 import AppHeader from "@/layout/AppHeader";
@@ -38,7 +39,9 @@ export default function AdminLayout({
         >
           <DeveloperSessionBanner />
           <AppHeader />
-          <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">{children}</div>
+          <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
+            <AgentRouteGuard>{children}</AgentRouteGuard>
+          </div>
         </div>
       </div>
     </AuthGate>
