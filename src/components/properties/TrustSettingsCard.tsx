@@ -9,27 +9,22 @@ import {
   type TrustSettings,
   type TrustSummary,
 } from "@/lib/properties";
+import StateRatesCard from "./StateRatesCard";
 
 const field =
   "h-10 w-28 rounded-lg border border-gray-300 bg-transparent px-3 text-sm outline-none focus:border-brand-500 dark:border-gray-700 dark:text-white/90";
 
-/** Rates an agency can start from. Entered, never applied automatically. */
-const PRESETS: Array<{ label: string; rates: Record<string, string> }> = [
-  { label: "Uttar Pradesh", rates: { stamp_duty_pct: "7", registration_pct: "1", registration_cap: "30000" } },
-  { label: "Haryana", rates: { stamp_duty_pct: "7", registration_pct: "1", registration_cap: "50000" } },
-  { label: "Delhi", rates: { stamp_duty_pct: "6", registration_pct: "1", registration_cap: "" } },
-  { label: "Maharashtra", rates: { stamp_duty_pct: "6", registration_pct: "1", registration_cap: "30000" } },
-  { label: "Karnataka", rates: { stamp_duty_pct: "5", registration_pct: "1", registration_cap: "" } },
-];
-
 /**
  * What a listing really costs, and how long a verification stays believable.
  *
- * Stamp duty and registration vary by state, by city, and in several states by the
- * buyer's gender. Nothing is assumed on an agency's behalf: until these are set,
- * every all-in cost on a card reads "from ₹65 L" and says in words what it left
- * out. The state buttons fill the form — they do not save, because the agency is
- * the one who knows which rate applies to its buyers.
+ * Brokerage, GST and the verification window are the agency's own terms and live
+ * here. Stamp duty and registration are set by each state, so they live in
+ * `StateRatesCard`, one row per state. Nothing is assumed on an agency's behalf:
+ * until a listing's state has a rate, its all-in reads "from ₹65 L" and says in
+ * words what it left out.
+ *
+ * The stamp duty and registration boxes kept here are the fallback for the
+ * default state — what an agency entered before per-state rates existed.
  */
 export default function TrustSettingsCard() {
   const [settings, setSettings] = useState<TrustSettings | null>(null);
@@ -42,7 +37,9 @@ export default function TrustSettingsCard() {
     brokerage_pct: "",
     rent_brokerage_months: "",
     verification_valid_days: "30",
+    default_state_code: "",
   });
+  const [states, setStates] = useState<Array<{ code: string; name: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -57,6 +54,7 @@ export default function TrustSettingsCard() {
       brokerage_pct: next.brokerage_pct ?? "",
       rent_brokerage_months: next.rent_brokerage_months ?? "",
       verification_valid_days: String(next.verification_valid_days ?? 30),
+      default_state_code: next.default_state_code ?? "",
     });
   }, []);
 
@@ -96,9 +94,10 @@ export default function TrustSettingsCard() {
           brokerage_pct: form.brokerage_pct.trim() || null,
           rent_brokerage_months: form.rent_brokerage_months.trim() || null,
           verification_valid_days: Number(form.verification_valid_days) || 30,
+          default_state_code: form.default_state_code || null,
         }),
       );
-      setNotice("Saved. Listing cards will show the full cost.");
+      setNotice("Saved.");
       void load();
     } catch (err) {
       setError(failureText(err, "Could not save those rates."));
@@ -118,9 +117,9 @@ export default function TrustSettingsCard() {
       </h3>
       <p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
         Every listing card shows when it was last verified, its RERA number, its
-        carpet area and what it actually costs. Enter your state&apos;s rates and the
-        all-in figure becomes exact; leave them blank and it says what it left out
-        rather than guessing.
+        carpet area and what it actually costs. Set the rates for the states you sell
+        in and the all-in figure becomes exact; leave one blank and it says what it
+        left out rather than guessing.
       </p>
 
       {summary ? (
@@ -156,31 +155,28 @@ export default function TrustSettingsCard() {
       {error ? <p className="mt-3 text-sm text-error-500">{error}</p> : null}
       {notice ? <p className="mt-3 text-sm text-success-600">{notice}</p> : null}
 
-      <div className="mt-5">
-        <span className="mb-2 block text-sm text-gray-500">Start from a state</span>
-        <div className="flex flex-wrap gap-2">
-          {PRESETS.map((preset) => (
-            <button
-              key={preset.label}
-              type="button"
-              onClick={() => setForm((current) => ({ ...current, ...preset.rates }))}
-              className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:border-brand-500 dark:border-gray-700 dark:text-gray-200"
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          These fill the form only. Check them against your own registrar before
-          saving — several states charge women buyers 1% less, and city rates differ.
-        </p>
-      </div>
-
       <form onSubmit={onSubmit} className="mt-5 flex flex-wrap items-end gap-4">
+        <label className="block text-sm">
+          <span className="mb-1.5 block text-gray-500">Home state</span>
+          <select
+            value={form.default_state_code}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, default_state_code: event.target.value }))
+            }
+            className={`${field} w-44`}
+          >
+            <option value="">Not set</option>
+            {states.map((state) => (
+              <option key={state.code} value={state.code}>
+                {state.name}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-gray-400">
+            when a location names no state
+          </span>
+        </label>
         {[
-          { key: "stamp_duty_pct" as const, label: "Stamp duty %", hint: "of agreement value" },
-          { key: "registration_pct" as const, label: "Registration %", hint: "" },
-          { key: "registration_cap" as const, label: "Registration cap ₹", hint: "if capped" },
           { key: "gst_pct" as const, label: "GST %", hint: "under construction" },
           { key: "brokerage_pct" as const, label: "Brokerage % (sale)", hint: "" },
           {
@@ -210,14 +206,49 @@ export default function TrustSettingsCard() {
             ) : null}
           </label>
         ))}
+        <details className="w-full text-sm">
+          <summary className="cursor-pointer text-gray-500">
+            Fallback stamp duty &amp; registration
+          </summary>
+          <p className="mt-2 max-w-3xl text-xs text-gray-400">
+            Used only for your home state when it has no row below, or when a
+            location names no state. Never used for another state.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-4">
+            {[
+              { key: "stamp_duty_pct" as const, label: "Stamp duty %" },
+              { key: "registration_pct" as const, label: "Registration %" },
+              { key: "registration_cap" as const, label: "Registration cap ₹" },
+            ].map((item) => (
+              <label key={item.key} className="block">
+                <span className="mb-1.5 block text-gray-500">{item.label}</span>
+                <input
+                  value={form[item.key]}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, [item.key]: event.target.value }))
+                  }
+                  inputMode="decimal"
+                  placeholder="—"
+                  className={field}
+                />
+              </label>
+            ))}
+          </div>
+        </details>
         <button
           type="submit"
           disabled={saving}
           className="h-10 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50"
         >
-          {saving ? "Saving…" : "Save rates"}
+          {saving ? "Saving…" : "Save settings"}
         </button>
       </form>
+
+      <StateRatesCard
+        missingStates={settings?.states_missing_rates ?? []}
+        stateNames={setStates}
+        onChanged={() => void load()}
+      />
     </section>
   );
 }
