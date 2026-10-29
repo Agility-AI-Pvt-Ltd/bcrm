@@ -22,6 +22,21 @@ import PropertyIntakePanel from "@/components/properties/PropertyIntakePanel";
 
 const PAGE_SIZE = 50;
 
+type Tab = "inventory" | "add" | "settings";
+type Source = "whatsapp" | "sheets" | "upload";
+
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: "inventory", label: "Inventory" },
+  { id: "add", label: "Add listings" },
+  { id: "settings", label: "Pricing & trust" },
+];
+
+const SOURCES: Array<{ id: Source; label: string; hint: string }> = [
+  { id: "whatsapp", label: "Staff WhatsApp", hint: "Listings your team sends in chat" },
+  { id: "sheets", label: "Google Sheets", hint: "Keep a sheet in sync automatically" },
+  { id: "upload", label: "File upload", hint: "Import a CSV or Excel file once" },
+];
+
 const EMPTY_STATS: PropertyStats = {
   active_listings: 0,
   new_this_month: 0,
@@ -42,6 +57,8 @@ export default function PropertiesPage() {
   const [stats, setStats] = useState<PropertyStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState<Tab>("inventory");
+  const [source, setSource] = useState<Source>("whatsapp");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,95 +121,185 @@ export default function PropertiesPage() {
         })}
       </div>
 
-      <TrustSettingsCard />
+      <div
+        role="tablist"
+        aria-label="Properties sections"
+        className="mb-6 flex gap-6 overflow-x-auto border-b border-gray-200 dark:border-gray-800"
+      >
+        {TABS.map((item) => {
+          const active = tab === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              role="tab"
+              id={`properties-tab-${item.id}`}
+              aria-selected={active}
+              aria-controls={`properties-panel-${item.id}`}
+              onClick={() => setTab(item.id)}
+              className={`-mb-px whitespace-nowrap border-b-2 pb-3 text-sm font-medium transition ${
+                active
+                  ? "border-brand-500 text-brand-600 dark:text-brand-400"
+                  : "border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white/90"
+              }`}
+            >
+              {item.label}
+              {item.id === "inventory" && !loading ? (
+                <span className="ml-2 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">
+                  {total}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
 
-      <PropertyIntakePanel />
-
-      <PropertySheetsPanel onSynced={load} />
-
-      <PropertyImportPanel onImported={load} />
-
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
-        <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
-          <div>
-            <h2 className="font-semibold text-gray-900 dark:text-white/90">
-              Property inventory
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {loading
-                ? "Loading listings from the database…"
-                : `${total} listing${total === 1 ? "" : "s"} in this organization.`}
-            </p>
+      {/* Panels stay mounted while hidden so a half-filled form or a running
+          sync survives a tab switch. */}
+      <div
+        role="tabpanel"
+        id="properties-panel-inventory"
+        aria-labelledby="properties-tab-inventory"
+        hidden={tab !== "inventory"}
+      >
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+          <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-gray-800">
+            <div>
+              <h2 className="font-semibold text-gray-900 dark:text-white/90">
+                Property inventory
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {loading
+                  ? "Loading listings from the database…"
+                  : `${total} listing${total === 1 ? "" : "s"} in this organization.`}
+              </p>
+            </div>
           </div>
-        </div>
 
-        {error ? (
-          <p className="px-5 py-4 text-sm text-error-500">{error}</p>
-        ) : null}
+          {error ? (
+            <p className="px-5 py-4 text-sm text-error-500">{error}</p>
+          ) : null}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
-              <tr>
-                <th className="px-5 py-3 font-medium">Property</th>
-                <th className="px-5 py-3 font-medium">Location</th>
-                <th className="px-5 py-3 font-medium">BHK</th>
-                <th className="px-5 py-3 font-medium">Listing</th>
-                <th className="px-5 py-3 font-medium">Price</th>
-                <th className="px-5 py-3 font-medium">Source</th>
-                <th className="px-5 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {loading ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-white/[0.02] dark:text-gray-400">
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
-                    Loading properties…
-                  </td>
+                  <th className="px-5 py-3 font-medium">Property</th>
+                  <th className="px-5 py-3 font-medium">Location</th>
+                  <th className="px-5 py-3 font-medium">BHK</th>
+                  <th className="px-5 py-3 font-medium">Listing</th>
+                  <th className="px-5 py-3 font-medium">Price</th>
+                  <th className="px-5 py-3 font-medium">Source</th>
+                  <th className="px-5 py-3 font-medium">Status</th>
                 </tr>
-              ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
-                    No properties in the database for this organization.
-                  </td>
-                </tr>
-              ) : (
-                items.map((property) => (
-                  <tr key={property.id}>
-                    <td className="whitespace-nowrap px-5 py-4 font-medium text-gray-800 dark:text-white/90">
-                      {property.title}
-                    </td>
-                    <td className="px-5 py-4 text-gray-500 dark:text-gray-400">
-                      {property.location}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-gray-500 dark:text-gray-400">
-                      {property.bhk || property.property_type || "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-gray-500 dark:text-gray-400">
-                      {property.listing_type || "—"}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-gray-500 dark:text-gray-400">
-                      {formatPropertyPrice(property)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4">
-                      <Badge
-                        color={property.source === "sheet" ? "info" : "light"}
-                        size="sm"
-                      >
-                        {property.source === "sheet" ? "Sheet" : "Manual"}
-                      </Badge>
-                    </td>
-                    <td className="px-5 py-4">
-                      <Badge color={statusColor(String(property.status))} size="sm">
-                        {propertyStatusLabel(String(property.status))}
-                      </Badge>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
+                      Loading properties…
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : items.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
+                      No properties in the database for this organization.
+                    </td>
+                  </tr>
+                ) : (
+                  items.map((property) => (
+                    <tr key={property.id}>
+                      <td className="whitespace-nowrap px-5 py-4 font-medium text-gray-800 dark:text-white/90">
+                        {property.title}
+                      </td>
+                      <td className="px-5 py-4 text-gray-500 dark:text-gray-400">
+                        {property.location}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4 text-gray-500 dark:text-gray-400">
+                        {property.bhk || property.property_type || "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4 text-gray-500 dark:text-gray-400">
+                        {property.listing_type || "—"}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4 text-gray-500 dark:text-gray-400">
+                        {formatPropertyPrice(property)}
+                      </td>
+                      <td className="whitespace-nowrap px-5 py-4">
+                        <Badge
+                          color={property.source === "sheet" ? "info" : "light"}
+                          size="sm"
+                        >
+                          {property.source === "sheet" ? "Sheet" : "Manual"}
+                        </Badge>
+                      </td>
+                      <td className="px-5 py-4">
+                        <Badge color={statusColor(String(property.status))} size="sm">
+                          {propertyStatusLabel(String(property.status))}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+      </div>
+
+      <div
+        role="tabpanel"
+        id="properties-panel-add"
+        aria-labelledby="properties-tab-add"
+        hidden={tab !== "add"}
+      >
+        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {SOURCES.map((item) => {
+            const active = source === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setSource(item.id)}
+                className={`rounded-xl border px-4 py-3 text-left transition ${
+                  active
+                    ? "border-brand-500 bg-brand-50 ring-1 ring-brand-500 dark:bg-brand-500/10"
+                    : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-gray-700"
+                }`}
+              >
+                <span
+                  className={`block text-sm font-semibold ${
+                    active ? "text-brand-700 dark:text-brand-400" : "text-gray-800 dark:text-white/90"
+                  }`}
+                >
+                  {item.label}
+                </span>
+                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                  {item.hint}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div hidden={source !== "whatsapp"}>
+          <PropertyIntakePanel />
+        </div>
+        <div hidden={source !== "sheets"}>
+          <PropertySheetsPanel onSynced={load} />
+        </div>
+        <div hidden={source !== "upload"}>
+          <PropertyImportPanel onImported={load} />
+        </div>
+      </div>
+
+      <div
+        role="tabpanel"
+        id="properties-panel-settings"
+        aria-labelledby="properties-tab-settings"
+        hidden={tab !== "settings"}
+      >
+        <TrustSettingsCard />
       </div>
     </div>
   );
