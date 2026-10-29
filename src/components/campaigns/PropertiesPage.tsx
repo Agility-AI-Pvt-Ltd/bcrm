@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import Badge from "@/components/ui/badge/Badge";
+import Pagination from "@/components/tables/Pagination";
 import { ApiError } from "@/lib/api";
 import {
   formatPropertyPrice,
@@ -20,7 +21,7 @@ import PropertySheetsPanel from "@/components/campaigns/PropertySheetsPanel";
 import TrustSettingsCard from "@/components/properties/TrustSettingsCard";
 import PropertyIntakePanel from "@/components/properties/PropertyIntakePanel";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 10;
 
 type Tab = "inventory" | "add" | "settings";
 type Source = "whatsapp" | "sheets" | "upload";
@@ -57,6 +58,7 @@ export default function PropertiesPage() {
   const [stats, setStats] = useState<PropertyStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
   const [tab, setTab] = useState<Tab>("inventory");
   const [source, setSource] = useState<Source>("whatsapp");
 
@@ -64,12 +66,19 @@ export default function PropertiesPage() {
     setLoading(true);
     setError("");
     try {
-      const [page, propertyStats] = await Promise.all([
-        listProperties(1, PAGE_SIZE),
+      const [result, propertyStats] = await Promise.all([
+        listProperties(page, PAGE_SIZE),
         getPropertyStats(),
       ]);
-      setItems(page.items);
-      setTotal(page.total);
+      // A sync or delete can shrink the list under the current page; step
+      // back to the last page that still has rows rather than show an empty one.
+      const lastPage = Math.max(1, Math.ceil(result.total / PAGE_SIZE));
+      if (page > lastPage) {
+        setPage(lastPage);
+        return;
+      }
+      setItems(result.items);
+      setTotal(result.total);
       setStats(propertyStats);
     } catch (err) {
       setItems([]);
@@ -79,7 +88,11 @@ export default function PropertiesPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const firstRow = (page - 1) * PAGE_SIZE + 1;
+  const lastRow = Math.min(page * PAGE_SIZE, total);
 
   useEffect(() => {
     void load();
@@ -243,6 +256,20 @@ export default function PropertiesPage() {
               </tbody>
             </table>
           </div>
+
+          {/* One page of results needs no pager; showing a dead one is noise. */}
+          {totalPages > 1 ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-5 py-4 dark:border-gray-800">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Showing {firstRow}–{lastRow} of {total}
+              </p>
+              <Pagination
+                currentPage={page}
+                totalPages={totalPages}
+                onPageChange={(next) => setPage(Math.min(Math.max(1, next), totalPages))}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
