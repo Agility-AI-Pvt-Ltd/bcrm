@@ -271,13 +271,77 @@ export type TrustSettings = {
   gst_pct: string | null;
   brokerage_pct: string | null;
   rent_brokerage_months: string | null;
+  /** The state a listing is placed in when its location does not say ("UP"). */
+  default_state_code: string | null;
   show_all_in: boolean;
   show_unverified_badge: boolean;
   /** Which rates still have to be entered before an all-in can be complete. */
   missing: string[];
+  /** States with sale listings but no stamp duty rate, most listings first. */
+  states_missing_rates: string[];
 };
 
-export type TrustSettingsUpdate = Partial<Omit<TrustSettings, "missing">>;
+export type TrustSettingsUpdate = Partial<
+  Omit<TrustSettings, "missing" | "states_missing_rates">
+>;
+
+/**
+ * Stamp duty and registration for one state, or one city within it, from a date.
+ *
+ * Brokerage, GST and how long a verification lasts stay on `TrustSettings`: they
+ * are the agency's own terms. Stamp duty and registration are set by each state,
+ * so an NCR agency with Delhi, Noida and Gurgaon stock needs three rows.
+ */
+export type StateRate = {
+  id: string;
+  state_code: string;
+  state_name: string | null;
+  city: string | null;
+  effective_from: string;
+  /** The row cards are using today; false for a superseded or scheduled one. */
+  in_effect: boolean;
+  stamp_duty_pct: string | null;
+  stamp_duty_female_pct: string | null;
+  registration_pct: string | null;
+  registration_cap: string | null;
+  source_url: string | null;
+  notes: string | null;
+};
+
+export type StateRateFields = {
+  stamp_duty_pct: string | null;
+  stamp_duty_female_pct: string | null;
+  registration_pct: string | null;
+  registration_cap: string | null;
+  source_url: string | null;
+  notes: string | null;
+  effective_from?: string | null;
+};
+
+export type StateRateCreate = StateRateFields & {
+  state_code: string;
+  city?: string | null;
+};
+
+/** Published rates for a state, offered to choose from. Null = enter it yourself. */
+export type StatePreset = {
+  state_code: string;
+  state_name: string;
+  city: string | null;
+  stamp_duty_pct: string | null;
+  stamp_duty_female_pct: string | null;
+  registration_pct: string | null;
+  registration_cap: string | null;
+  source_url: string;
+  notes: string;
+  confidence: "high" | "medium" | "low";
+  applied: boolean;
+};
+
+export type StatePresetBulkResult = {
+  applied: StateRate[];
+  skipped: Array<{ state_code: string; city: string; reason: string }>;
+};
 
 export type TrustSummary = {
   total: number;
@@ -303,6 +367,35 @@ export const saveTrustSettings = (payload: TrustSettingsUpdate) =>
 
 export const getTrustSummary = () =>
   apiFetch<TrustSummary>("/api/v1/properties/trust/summary");
+
+export const listStateRates = () =>
+  apiFetch<StateRate[]>("/api/v1/properties/trust/state-rates");
+
+export const createStateRate = (payload: StateRateCreate) =>
+  apiFetch<StateRate>("/api/v1/properties/trust/state-rates", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateStateRate = (rateId: string, payload: Partial<StateRateFields>) =>
+  apiFetch<StateRate>(`/api/v1/properties/trust/state-rates/${rateId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+
+export const deleteStateRate = (rateId: string) =>
+  apiFetch<void>(`/api/v1/properties/trust/state-rates/${rateId}`, { method: "DELETE" });
+
+export const listStatePresets = () =>
+  apiFetch<StatePreset[]>("/api/v1/properties/trust/state-presets");
+
+export const applyStatePresets = (
+  choices: Array<{ state_code: string; city: string | null }>,
+) =>
+  apiFetch<StatePresetBulkResult>("/api/v1/properties/trust/state-presets/apply", {
+    method: "POST",
+    body: JSON.stringify({ choices }),
+  });
 
 export const verifyProperty = (propertyId: string, verified = true) =>
   apiFetch<PropertyRecord>(`/api/v1/properties/${propertyId}/verify`, {
