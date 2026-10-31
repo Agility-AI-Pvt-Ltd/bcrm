@@ -10,14 +10,23 @@ import {
   listUsageRates,
   quantity,
   rupees,
+  tokens,
+  tokensFromThousands,
   type AccountSpend,
   type AccountSpendDetail,
+  type SpendWindow,
   type UsageRate,
 } from "@/lib/adminApi";
 import AdminNav from "./AdminNav";
 import AdminRateCard, { unpricedCount } from "./AdminRateCard";
 
-const WINDOWS = [7, 30, 90];
+const WINDOWS: SpendWindow[] = [7, 30, 90, "all"];
+
+const TOKEN_UNIT = "1k_tokens";
+
+function windowLabel(window: SpendWindow) {
+  return window === "all" ? "All time" : `${window} days`;
+}
 
 function when(value?: string | null) {
   if (!value) return "—";
@@ -40,7 +49,7 @@ function when(value?: string | null) {
  */
 export default function AdminSpendClient() {
   const router = useRouter();
-  const [days, setDays] = useState(30);
+  const [days, setDays] = useState<SpendWindow>(30);
   const [accounts, setAccounts] = useState<AccountSpend[]>([]);
   const [selected, setSelected] = useState<AccountSpendDetail | null>(null);
   // Kept only for the "n unset" badge on the toggle: the card itself owns the
@@ -54,7 +63,7 @@ export default function AdminSpendClient() {
     if (!getAdminToken()) router.replace("/admin/login");
   }, [router]);
 
-  const load = useCallback(async (window: number) => {
+  const load = useCallback(async (window: SpendWindow) => {
     setLoading(true);
     setError("");
     try {
@@ -93,8 +102,9 @@ export default function AdminSpendClient() {
             Account spend
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            What each agency cost to serve over the last {days} days — calls, AI text and
-            WhatsApp, priced at what we pay our providers.
+            What each agency cost to serve{" "}
+            {days === "all" ? "since it joined" : `over the last ${days} days`} — calls, AI
+            text and WhatsApp, priced at what we pay our providers.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -113,7 +123,7 @@ export default function AdminSpendClient() {
                     : "rounded-md px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:text-gray-300"
                 }
               >
-                {window} days
+                {windowLabel(window)}
               </button>
             ))}
           </div>
@@ -147,6 +157,7 @@ export default function AdminSpendClient() {
             <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-white/[0.04]">
               <tr>
                 <th className="px-4 py-3 font-medium">Account</th>
+                <th className="px-4 py-3 text-right font-medium">AI tokens</th>
                 <th className="px-4 py-3 text-right font-medium">Customers</th>
                 <th className="px-4 py-3 text-right font-medium">Per customer</th>
                 <th className="px-4 py-3 text-right font-medium">Total cost</th>
@@ -168,6 +179,17 @@ export default function AdminSpendClient() {
                       {row.has_unpriced ? " · some usage not priced" : ""}
                     </p>
                   </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-right">
+                    <p className="text-gray-700 dark:text-gray-200">
+                      {(row.total_tokens ?? 0).toLocaleString("en-IN")}
+                    </p>
+                    {row.total_tokens ? (
+                      <p className="text-xs text-gray-500">
+                        in {(row.input_tokens ?? 0).toLocaleString("en-IN")} · out{" "}
+                        {(row.output_tokens ?? 0).toLocaleString("en-IN")}
+                      </p>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3 text-right text-gray-700 dark:text-gray-200">
                     {row.customers.toLocaleString("en-IN")}
                   </td>
@@ -181,7 +203,7 @@ export default function AdminSpendClient() {
               ))}
               {accounts.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-6 text-sm text-gray-500" colSpan={4}>
+                  <td className="px-4 py-6 text-sm text-gray-500" colSpan={5}>
                     No accounts yet.
                   </td>
                 </tr>
@@ -199,7 +221,9 @@ export default function AdminSpendClient() {
                 {selected.organization_name || selected.organization_id}
               </h2>
               <p className="mt-1 text-xs text-gray-500">
-                {when(selected.period_start)} — {when(selected.period_end)}
+                {days === "all"
+                  ? `All time, up to ${when(selected.period_end)}`
+                  : `${when(selected.period_start)} — ${when(selected.period_end)}`}
               </p>
             </div>
             <button
@@ -230,6 +254,24 @@ export default function AdminSpendClient() {
             ))}
           </div>
 
+          <div className="mt-3 grid grid-cols-3 gap-3">
+            {[
+              ["AI tokens in", selected.input_tokens],
+              ["AI tokens out", selected.output_tokens],
+              ["AI tokens total", selected.total_tokens],
+            ].map(([label, value]) => (
+              <div
+                key={label}
+                className="rounded-xl border border-gray-100 p-3 dark:border-gray-800"
+              >
+                <p className="text-xs uppercase tracking-wide text-gray-500">{label}</p>
+                <p className="mt-1 text-lg font-semibold text-gray-800 dark:text-white/90">
+                  {Number(value ?? 0).toLocaleString("en-IN")}
+                </p>
+              </div>
+            ))}
+          </div>
+
           {selected.lines.length ? (
             <ul className="mt-4 space-y-2">
               {selected.lines.map((line) => (
@@ -240,9 +282,16 @@ export default function AdminSpendClient() {
                   <span className="text-gray-700 dark:text-gray-200">
                     {line.label}
                     <span className="ml-2 text-xs text-gray-500">
-                      {quantity(line.quantity)} {line.unit_label} · {line.events} events
+                      {line.unit === TOKEN_UNIT
+                        ? tokens(tokensFromThousands(line.quantity))
+                        : `${quantity(line.quantity)} ${line.unit_label}`}{" "}
+                      · {line.events} events
                       {Number(line.unpriced_quantity) > 0
-                        ? ` · ${quantity(line.unpriced_quantity)} unpriced`
+                        ? ` · ${
+                            line.unit === TOKEN_UNIT
+                              ? tokens(tokensFromThousands(line.unpriced_quantity))
+                              : quantity(line.unpriced_quantity)
+                          } unpriced`
                         : ""}
                     </span>
                   </span>
@@ -281,7 +330,9 @@ export default function AdminSpendClient() {
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-200">{entry.key}</td>
                     <td className="px-3 py-2 text-gray-500">{entry.source || "—"}</td>
                     <td className="whitespace-nowrap px-3 py-2 text-right text-gray-500">
-                      {quantity(entry.quantity)} {entry.unit}
+                      {entry.unit === TOKEN_UNIT
+                        ? tokens(tokensFromThousands(entry.quantity))
+                        : `${quantity(entry.quantity)} ${entry.unit}`}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right text-gray-500">
                       {rupees(entry.unit_rate, 4)}

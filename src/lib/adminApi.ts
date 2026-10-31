@@ -293,6 +293,10 @@ export type AccountSpend = {
   /** Some usage happened that nobody had priced. The screens say so next to the
    *  total, so a small number is not read as a small bill. */
   has_unpriced: boolean;
+  /** AI text tokens in the window. Exact counts, not thousands. */
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
 };
 
 export type AccountSpendDetail = AccountSpend & { entries: SpendEntry[] };
@@ -346,16 +350,23 @@ export type RateSuggestions = {
   available: boolean;
 };
 
-export async function listAccountSpend(days = 30): Promise<AccountSpend[]> {
-  return adminFetch<AccountSpend[]>(`/api/v1/admin/spend?days=${days}`);
+/** A number of days back from now, or everything the ledger holds. */
+export type SpendWindow = number | "all";
+
+function windowQuery(window: SpendWindow): string {
+  return window === "all" ? "all_time=true" : `days=${window}`;
+}
+
+export async function listAccountSpend(window: SpendWindow = 30): Promise<AccountSpend[]> {
+  return adminFetch<AccountSpend[]>(`/api/v1/admin/spend?${windowQuery(window)}`);
 }
 
 export async function getAccountSpend(
   organizationId: string,
-  days = 30,
+  window: SpendWindow = 30,
 ): Promise<AccountSpendDetail> {
   return adminFetch<AccountSpendDetail>(
-    `/api/v1/admin/spend/${organizationId}?days=${days}&limit=200`,
+    `/api/v1/admin/spend/${organizationId}?${windowQuery(window)}&limit=200`,
   );
 }
 
@@ -405,6 +416,17 @@ export function quantity(value: string | null | undefined): string {
   const amount = Number(value);
   if (!Number.isFinite(amount)) return String(value);
   return amount.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+}
+
+/** "12,345 tokens". Whole tokens, never thousands with decimals. */
+export function tokens(value: number | null | undefined): string {
+  const count = Math.round(Number(value) || 0);
+  return `${count.toLocaleString("en-IN")} token${count === 1 ? "" : "s"}`;
+}
+
+/** Ledger rows store AI text in thousands of tokens; turn that back into a count. */
+export function tokensFromThousands(value: string | null | undefined): number {
+  return Math.round((Number(value) || 0) * 1000);
 }
 
 // --- developers ----------------------------------------------------------------
