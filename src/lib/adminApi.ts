@@ -68,9 +68,14 @@ export type AccountReviewPage = {
   pages: number;
 };
 
-export type QueueCounts = { pending: number; active: number; rejected: number };
+export type QueueCounts = {
+  pending: number;
+  active: number;
+  rejected: number;
+  revoked: number;
+};
 
-export type AccountFilter = "pending" | "active" | "rejected" | "all";
+export type AccountFilter = "pending" | "active" | "rejected" | "revoked" | "all";
 
 type ApiEnvelope<T> = {
   success: boolean;
@@ -189,7 +194,7 @@ export async function listAccounts(params: {
 
 export async function decideAccount(
   userId: string,
-  decision: "approve" | "reject" | "revoke",
+  decision: "approve" | "reject" | "revoke" | "reinstate",
   note?: string,
 ): Promise<AccountReview> {
   return adminFetch<AccountReview>(`/api/v1/admin/accounts/${userId}/${decision}`, {

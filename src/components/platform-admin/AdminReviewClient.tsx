@@ -22,6 +22,7 @@ const TABS: { key: AccountFilter; label: string }[] = [
   { key: "pending", label: "Awaiting verification" },
   { key: "active", label: "Verified" },
   { key: "rejected", label: "Rejected" },
+  { key: "revoked", label: "Revoked" },
   { key: "all", label: "All accounts" },
 ];
 
@@ -144,7 +145,7 @@ export default function AdminReviewClient() {
 
   const decide = async (
     userId: string,
-    decision: "approve" | "reject" | "revoke",
+    decision: "approve" | "reject" | "revoke" | "reinstate",
   ) => {
     setBusy(`${userId}:${decision}`);
     setError("");
@@ -180,7 +181,7 @@ export default function AdminReviewClient() {
       </header>
 
       {counts ? (
-        <div className="mb-6 grid grid-cols-3 gap-3">
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-xl border border-warning-200 bg-warning-50/50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
             <p className="text-xs font-medium text-warning-700 dark:text-warning-400">
               Awaiting verification
@@ -199,6 +200,12 @@ export default function AdminReviewClient() {
             <p className="text-xs font-medium text-gray-500">Rejected</p>
             <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
               {counts.rejected}
+            </p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+            <p className="text-xs font-medium text-gray-500">Revoked</p>
+            <p className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+              {counts.revoked ?? 0}
             </p>
           </div>
         </div>
@@ -344,7 +351,12 @@ export default function AdminReviewClient() {
 
               {row.reviewed_at ? (
                 <p className="mt-3 text-xs text-gray-500">
-                  {row.status === "active" ? "Approved" : "Decided"} {formatDate(row.reviewed_at)}
+                  {row.status === "active"
+                    ? "Approved"
+                    : row.status === "revoked"
+                      ? "Revoked"
+                      : "Decided"}{" "}
+                  {formatDate(row.reviewed_at)}
                   {row.reviewed_by ? ` by ${row.reviewed_by}` : ""}
                   {row.review_note ? ` — “${row.review_note}”` : ""}
                 </p>
@@ -395,6 +407,30 @@ export default function AdminReviewClient() {
                     className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300"
                   >
                     {busy === `${row.user_id}:revoke` ? "Revoking…" : "Revoke access"}
+                  </button>
+                </div>
+              ) : row.status === "revoked" ? (
+                <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                  <input
+                    type="text"
+                    value={notes[row.user_id] || ""}
+                    placeholder="Why access is being restored (optional)"
+                    onChange={(event) =>
+                      setNotes((current) => ({
+                        ...current,
+                        [row.user_id]: event.target.value,
+                      }))
+                    }
+                    className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    disabled={busy !== null}
+                    onClick={() => void decide(row.user_id, "reinstate")}
+                    title="Reopens the account with the days it had left when access was revoked"
+                    className="rounded-lg bg-success-500 px-4 py-2 text-sm font-medium text-white hover:bg-success-600 disabled:opacity-50"
+                  >
+                    {busy === `${row.user_id}:reinstate` ? "Restoring…" : "Make active again"}
                   </button>
                 </div>
               ) : null}
