@@ -42,6 +42,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import CustomerProfileDrawer from "@/components/campaigns/CustomerProfileDrawer";
 import LeadTileDetails from "@/components/campaigns/LeadTileDetails";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
@@ -117,6 +118,8 @@ export default function LeadsPage() {
   const [openTile, setOpenTile] = useState<HeadlineKey | null>(null);
   /** Bumped after a change the open list must re-read (a lead marked called). */
   const [detailsVersion, setDetailsVersion] = useState(0);
+  /** The customer whose profile is open from the table, as the tiles' list does. */
+  const [profileOf, setProfileOf] = useState<Lead | null>(null);
   const tableRef = useRef<HTMLDivElement | null>(null);
   const [markingId, setMarkingId] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -702,6 +705,7 @@ export default function LeadsPage() {
                     lead={lead}
                     marking={markingId === lead.id}
                     onMarkCalled={markCalled}
+                    onOpen={setProfileOf}
                   />
                 ))
               )}
@@ -734,6 +738,15 @@ export default function LeadsPage() {
           </div>
         </div>
       </div>
+
+      {profileOf ? (
+        <CustomerProfileDrawer
+          key={profileOf.id}
+          lead={profileOf}
+          onClose={() => setProfileOf(null)}
+          onChanged={reload}
+        />
+      ) : null}
 
       {notice && (
         <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-theme-lg dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
@@ -774,10 +787,13 @@ function LeadRow({
   lead,
   marking,
   onMarkCalled,
+  onOpen,
 }: {
   lead: Lead;
   marking: boolean;
   onMarkCalled: (lead: Lead) => void;
+  /** Open this customer's profile in the side drawer. */
+  onOpen: (lead: Lead) => void;
 }) {
   const wants = [lead.bhk, lead.preferred_location, lead.budget_label]
     .filter(Boolean)
@@ -788,9 +804,14 @@ function LeadRow({
   return (
     <tr className={waitingSince ? "bg-amber-50/50 dark:bg-amber-500/[0.04]" : undefined}>
       <td className="px-5 py-3">
-        <p className="font-medium text-gray-800 dark:text-white/90">
+        <button
+          type="button"
+          title="Open customer profile"
+          onClick={() => onOpen(lead)}
+          className="text-left font-medium text-brand-600 hover:text-brand-700 hover:underline focus:outline-none focus-visible:underline dark:text-brand-400"
+        >
           {lead.name || "Unnamed"}
-        </p>
+        </button>
         {chat ? (
           <a
             href={chat}
