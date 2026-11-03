@@ -808,7 +808,7 @@ function LeadRow({
           type="button"
           title="Open customer profile"
           onClick={() => onOpen(lead)}
-          className="text-left font-medium text-brand-600 hover:text-brand-700 hover:underline focus:outline-none focus-visible:underline dark:text-brand-400"
+          className="block text-left font-medium text-brand-600 hover:text-brand-700 hover:underline focus:outline-none focus-visible:underline dark:text-brand-400"
         >
           {lead.name || "Unnamed"}
         </button>
