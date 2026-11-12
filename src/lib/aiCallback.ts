@@ -25,11 +25,30 @@ export type AiCallbackSettings = {
   warnings: string[];
   /** Calls ring, but status updates or transcripts will not work. */
   advisories: string[];
+  /**
+   * Which voice agent places the calls, as chosen. If vc_v1 is chosen but has
+   * stopped being available, calls go out on pipecat_sarvam until it is again.
+   */
+  voice_engine: VoiceEngine;
+  voice_engines: VoiceEngineOption[];
+};
+
+/** pipecat_sarvam: the conversational agent. vc_v1: the fixed-flow, prerecorded one. */
+export type VoiceEngine = "pipecat_sarvam" | "vc_v1";
+
+export type VoiceEngineOption = {
+  id: VoiceEngine;
+  label: string;
+  description: string;
+  available: boolean;
+  /** Why it cannot be chosen, in words to show. Null when available. */
+  unavailable_reason: string | null;
 };
 
 export type AiCallbackUpdate = {
   enabled?: boolean;
   delay_minutes?: number;
+  voice_engine?: VoiceEngine;
 };
 
 export async function getAiCallback() {

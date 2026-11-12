@@ -364,8 +364,8 @@ export default function AdminReviewClient() {
                   </p>
                   <p className="mt-0.5 text-xs text-gray-500">
                     {row.vc_v1_allowed
-                      ? "On. The Flow Voice page opens for developer sessions in this account (and for its users once the server allows agents)."
-                      : "Off. The Flow Voice page stays hidden for this account."}
+                      ? "On. This agency can choose Flow voice instead of pipecat_sarvam for their AI callback, and the Flow Voice test page opens for developer sessions."
+                      : "Off. AI callback stays on pipecat_sarvam and the Flow Voice page stays hidden."}
                   </p>
                 </div>
                 <button
