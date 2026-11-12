@@ -46,6 +46,8 @@ export type AccountReview = {
    * all. Separate from the agency's own on/off switch, which only takes effect
    * while this is true. */
   ai_callback_allowed: boolean;
+  /** Whether this account may open Flow voice (vc_v1). Off until switched on. */
+  vc_v1_allowed: boolean;
   subscription_id?: string | null;
   plan_code?: string | null;
   plan_name?: string | null;
@@ -212,6 +214,8 @@ export async function decideAccount(
 // any effect.
 
 export const FEATURE_AI_CALLBACK = "ai_callback";
+/** Flow voice: the flow-based voice agent (vc_v1), separate from the AI callback. */
+export const FEATURE_VC_V1 = "vc_v1";
 
 export type FeatureGrant = {
   feature: string;

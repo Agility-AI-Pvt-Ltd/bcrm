@@ -7,6 +7,7 @@ import AdminNav from "./AdminNav";
 import {
   decideAccount,
   FEATURE_AI_CALLBACK,
+  FEATURE_VC_V1,
   fetchQueueCounts,
   getAdminToken,
   listAccounts,
@@ -118,26 +119,33 @@ export default function AdminReviewClient() {
   // dialling path re-reads the grant before it dials. The agency's own on/off
   // switch is untouched either way, so allowing them again restores what they
   // had rather than leaving it silently off.
-  const allowAiCallback = async (row: AccountReview, allowed: boolean) => {
-    const key = `${row.user_id}:ai_callback`;
-    setBusy(key);
+  const allowAiCallback = (row: AccountReview, allowed: boolean) =>
+    allowFeature(row, FEATURE_AI_CALLBACK, "ai_callback_allowed", allowed, "AI calling");
+
+  // Flow voice (vc_v1) works the same way, and is a separate switch on purpose:
+  // it is a different voice agent, still in testing, so allowing one never
+  // allows the other.
+  const allowVoiceFlow = (row: AccountReview, allowed: boolean) =>
+    allowFeature(row, FEATURE_VC_V1, "vc_v1_allowed", allowed, "Flow voice");
+
+  const allowFeature = async (
+    row: AccountReview,
+    feature: string,
+    field: "ai_callback_allowed" | "vc_v1_allowed",
+    allowed: boolean,
+    label: string,
+  ) => {
+    setBusy(`${row.user_id}:${feature}`);
     setError("");
     try {
-      await setAccountFeature(
-        row.user_id,
-        FEATURE_AI_CALLBACK,
-        allowed,
-        notes[row.user_id],
-      );
+      await setAccountFeature(row.user_id, feature, allowed, notes[row.user_id]);
       setRows((current) =>
         current.map((item) =>
-          item.user_id === row.user_id
-            ? { ...item, ai_callback_allowed: allowed }
-            : item,
+          item.user_id === row.user_id ? { ...item, [field]: allowed } : item,
         ),
       );
     } catch (err) {
-      setError(failureText(err, "Could not change AI calling for this account."));
+      setError(failureText(err, `Could not change ${label} for this account.`));
     } finally {
       setBusy(null);
     }
@@ -344,6 +352,36 @@ export default function AdminReviewClient() {
                   <span
                     className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
                       row.ai_callback_allowed ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-gray-800 dark:bg-white/[0.02]">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-800 dark:text-white/90">
+                    Flow voice (vc_v1)
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {row.vc_v1_allowed
+                      ? "On. The Flow Voice page opens for developer sessions in this account (and for its users once the server allows agents)."
+                      : "Off. The Flow Voice page stays hidden for this account."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={row.vc_v1_allowed}
+                  aria-label={`Allow Flow voice for ${row.full_name}`}
+                  disabled={busy !== null}
+                  onClick={() => void allowVoiceFlow(row, !row.vc_v1_allowed)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition disabled:opacity-50 ${
+                    row.vc_v1_allowed ? "bg-brand-500" : "bg-gray-300 dark:bg-gray-700"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 rounded-full bg-white shadow transition ${
+                      row.vc_v1_allowed ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
                 </button>
