@@ -59,6 +59,11 @@ export const AGENT_PATHS = [
   "/calendar",
   "/notifications",
   "/profile",
+  // Flow voice (vc_v1) is listed so the API alone decides who may use it: it
+  // answers "not open to agency users yet" until VC_V1_AGENTS_ALLOWED, and the
+  // sidebar hides the entry until it says yes. Opening it to agents is then a
+  // server setting, not a release.
+  "/voice-flow",
 ] as const;
 
 const ALWAYS_OPEN = ["/plans"];

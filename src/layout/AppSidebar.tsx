@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
+  AudioIcon,
   BellIcon,
   BoxCubeIcon,
   CalenderIcon,
@@ -23,6 +24,7 @@ import {
   UserCircleIcon,
 } from "../icons/index";
 import { useStoredUser } from "@/hooks/useStoredUser";
+import { useVoiceFlowStatus } from "@/hooks/useVoiceFlowStatus";
 import { canOpen, isAwaitingVerification, NOT_AVAILABLE_HINT } from "@/lib/access";
 
 type NavItem = {
@@ -31,6 +33,8 @@ type NavItem = {
   path?: string;
   new?: boolean;
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
+  /** Shown only when the API says this session may use the feature. */
+  feature?: "vc_v1";
 };
 
 const navItems: NavItem[] = [
@@ -116,6 +120,16 @@ const navItems: NavItem[] = [
     name: "AI Callback",
     path: "/ai-callback",
   },
+  // Flow voice (vc_v1): the prerecorded, flow-based agent, beside AI Callback
+  // rather than inside it, because it is a different agent. Hidden, not faded,
+  // until the API allows it: it is in testing and most accounts never see it.
+  {
+    icon: <AudioIcon />,
+    name: "Flow Voice",
+    path: "/voice-flow",
+    new: true,
+    feature: "vc_v1",
+  },
   // Where the money went. Top-level because "which portal should I cancel?" is a
   // question a broker asks every month and could not answer at all before.
   {
@@ -167,6 +181,11 @@ const AppSidebar: React.FC = () => {
   const pathname = usePathname();
   const storedUser = useStoredUser();
   const awaitingVerification = isAwaitingVerification(storedUser);
+  const voiceFlow = useVoiceFlowStatus(storedUser !== null);
+  const visibleItems = useMemo(
+    () => navItems.filter((nav) => nav.feature !== "vc_v1" || voiceFlow?.available),
+    [voiceFlow],
+  );
   // Sections an agent does not have stay in the menu, faded, and do not open.
   const locked = useCallback(
     (nav: NavItem) => {
@@ -179,11 +198,11 @@ const AppSidebar: React.FC = () => {
   // Which group the current URL lives in. Derived during render instead of
   // pushed into state from an effect, so navigating costs one render, not two.
   const routeSubmenu = useMemo(() => {
-    const index = navItems.findIndex((nav) =>
+    const index = visibleItems.findIndex((nav) =>
       nav.subItems?.some((subItem) => subItem.path === pathname),
     );
     return index === -1 ? null : index;
-  }, [pathname]);
+  }, [pathname, visibleItems]);
 
   // A click on a group header overrides the URL-derived choice, but only for as
   // long as we stay on the same page — storing the pathname alongside the
@@ -437,7 +456,7 @@ const AppSidebar: React.FC = () => {
                   </p>
                 ) : null
               ) : (
-                renderMenuItems(navItems)
+                renderMenuItems(visibleItems)
               )}
             </div>
           </div>
