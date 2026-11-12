@@ -7,6 +7,7 @@ import {
   getAiCallback,
   updateAiCallback,
   type AiCallbackSettings,
+  type AiCallbackUpdate,
 } from "@/lib/aiCallback";
 
 const fieldClass =
@@ -48,7 +49,7 @@ export default function AiCallbackForm() {
     return () => clearTimeout(timer);
   }, [notice]);
 
-  const save = async (payload: { enabled?: boolean; delay_minutes?: number }, done: string) => {
+  const save = async (payload: AiCallbackUpdate, done: string) => {
     setSaving(true);
     setError("");
     try {
@@ -193,6 +194,64 @@ export default function AiCallbackForm() {
 
       {error ? <p className="mt-3 text-sm text-error-500">{error}</p> : null}
       {notice ? <p className="mt-3 text-sm text-success-600">{notice}</p> : null}
+
+      {/* Which agent makes the call. Saves on click, like the switch above. An
+          agent the account cannot use yet stays visible, greyed, with the reason. */}
+      <fieldset className="mt-6 rounded-xl border border-gray-100 p-4 dark:border-gray-800">
+        <legend className="px-1 text-sm font-medium text-gray-800 dark:text-white/90">
+          Voice agent
+        </legend>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          {(settings.voice_engines ?? []).map((option) => {
+            const selected = settings.voice_engine === option.id;
+            const usable = allowed && option.available;
+            return (
+              <label
+                key={option.id}
+                title={option.unavailable_reason || undefined}
+                className={`flex gap-3 rounded-xl border p-3 text-sm transition ${
+                  selected
+                    ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
+                    : "border-gray-200 dark:border-gray-800"
+                } ${usable && !saving ? "cursor-pointer" : "cursor-not-allowed opacity-60"}`}
+              >
+                <input
+                  type="radio"
+                  name="voice_engine"
+                  value={option.id}
+                  checked={selected}
+                  disabled={!usable || saving}
+                  onChange={() =>
+                    void save(
+                      { voice_engine: option.id },
+                      `Calls will be made by ${option.label}.`,
+                    )
+                  }
+                  className="mt-1"
+                />
+                <span className="min-w-0">
+                  <span className="block font-medium text-gray-800 dark:text-white/90">
+                    {option.label}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-gray-500">{option.description}</span>
+                  {option.unavailable_reason ? (
+                    <span className="mt-1 block text-xs text-warning-600">
+                      {option.unavailable_reason}
+                    </span>
+                  ) : null}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        {settings.voice_engine === "vc_v1" &&
+        settings.voice_engines?.some((o) => o.id === "vc_v1" && !o.available) ? (
+          <p className="mt-2 text-xs text-warning-600">
+            Flow voice is chosen but not available right now, so calls are made by the
+            conversational AI until it is.
+          </p>
+        ) : null}
+      </fieldset>
 
       <form onSubmit={onSave} className="mt-6 rounded-xl border border-gray-100 p-4 dark:border-gray-800">
         <label className="block">
