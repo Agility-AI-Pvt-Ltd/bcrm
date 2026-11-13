@@ -83,6 +83,8 @@ export type VoiceFlowSnapshot = {
   listening: boolean;
   ended: boolean;
   slots: Record<string, string>;
+  /** ISO dates behind values a spoken date decided ("20 November" -> move_in). */
+  dates?: Record<string, string>;
   counters: { no_input: number; no_match: number; off_topic: number };
   turns: number;
   outcome: VoiceFlowOutcome | null;

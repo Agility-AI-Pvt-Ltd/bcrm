@@ -487,7 +487,7 @@ export default function VoiceFlowConsole({ defaultCustomerName }: { defaultCusto
             {(flow?.slots ?? []).map((slot) => (
               <div key={slot} className="contents">
                 <dt className="text-gray-500">{slot}</dt>
-                <dd className="text-gray-800 dark:text-white/90">{snap?.slots[slot] ?? "—"}</dd>
+                <dd className="text-gray-800 dark:text-white/90">{collected(snap, slot)}</dd>
               </div>
             ))}
           </dl>
@@ -505,6 +505,17 @@ export default function VoiceFlowConsole({ defaultCustomerName }: { defaultCusto
       </aside>
     </div>
   );
+}
+
+/** A collected value, with the date the caller said when one decided it. */
+function collected(snap: VoiceFlowSnapshot | null, slot: string): string {
+  const value = snap?.slots[slot];
+  if (!value) return "—";
+  const when = snap?.dates?.[slot];
+  if (!when) return value.replace(/_/g, " ");
+  const day = new Date(`${when}T00:00:00`);
+  const label = day.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return `${label} (${value.replace(/_/g, " ")})`;
 }
 
 function Panel({ title, children }: { title: string; children: React.ReactNode }) {
