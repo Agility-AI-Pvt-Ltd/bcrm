@@ -6,7 +6,19 @@
  * inside the customer's chat on Messages.
  */
 
-import type { AiCallDetail } from "@/lib/aiCallback";
+import type { AiCallDetail, VoiceEngine } from "@/lib/aiCallback";
+
+/** The two agents an AI call can run on, by the names the settings use. */
+const VOICE_AGENTS: Record<VoiceEngine, { label: string; className: string }> = {
+  pipecat_sarvam: {
+    label: "Conversational AI (pipecat_sarvam)",
+    className: "bg-gray-100 text-gray-700 dark:bg-white/[0.06] dark:text-gray-300",
+  },
+  vc_v1: {
+    label: "Flow voice (vc_v1)",
+    className: "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300",
+  },
+};
 
 const REQUIREMENT_LABELS: Record<string, string> = {
   budget: "Budget",
@@ -63,6 +75,19 @@ export default function AiCallDetails({ call }: { call: AiCallDetail }) {
       {call.failure_reason ? (
         <p className="rounded-md bg-error-50 px-3 py-2 text-xs text-error-700 dark:bg-error-500/10 dark:text-error-400">
           {call.failure_reason}
+        </p>
+      ) : null}
+
+      {call.voice_engine ? (
+        <p className="text-xs text-gray-500">
+          Voice agent:{" "}
+          <span
+            className={`rounded-full px-2 py-0.5 font-medium ${
+              VOICE_AGENTS[call.voice_engine]?.className ?? VOICE_AGENTS.pipecat_sarvam.className
+            }`}
+          >
+            {VOICE_AGENTS[call.voice_engine]?.label ?? call.voice_engine}
+          </span>
         </p>
       ) : null}
 
