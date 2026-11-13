@@ -103,6 +103,8 @@ export type AiCallDetail = {
   /** budget / bhk / locality / move_in / purpose, as the customer said them. */
   requirements: Record<string, string>;
   language: string | null;
+  /** Which voice agent took the call. Null until the call is dialled. */
+  voice_engine?: VoiceEngine | null;
   transcript: { speaker: "customer" | "ai" | string; text: string }[];
   /** Why the call failed, in words a broker can act on. */
   failure_reason: string | null;
