@@ -31,7 +31,7 @@ import {
   type InboxFilters,
   type InboxSort,
 } from "@/lib/inbox";
-import { CUSTOMER_STAGES, ENGAGEMENT_TIERS } from "@/lib/outreach";
+import { CUSTOMER_STAGES, ENGAGEMENT_TIERS, tierLabel } from "@/lib/outreach";
 import { useState } from "react";
 import {
   dotFor,
@@ -237,7 +237,7 @@ export default function MessageFilters({
             <option value="">Any</option>
             {tiers.map((name) => (
               <option key={name} value={name}>
-                {name}
+                {tierLabel(name)}
               </option>
             ))}
           </select>

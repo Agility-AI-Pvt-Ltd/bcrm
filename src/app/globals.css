@@ -556,7 +556,7 @@ span.flatpickr-weekday,
   @apply !border-gray-200 dark:!border-gray-800;
 }
 .fc .fc-col-header-cell-cushion {
-  @apply !px-5 !py-4 text-sm font-medium uppercase text-gray-400;
+  @apply !px-5 !py-4 text-sm font-medium text-gray-400;
 }
 .fc .fc-daygrid-day.fc-day-today {
   @apply bg-transparent;

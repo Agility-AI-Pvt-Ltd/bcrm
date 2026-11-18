@@ -26,7 +26,7 @@ import {
   type CustomerProfile,
   type InterestAssessment,
 } from "@/lib/inbox";
-import { formatWhen, stageBadgeColor } from "@/lib/outreach";
+import { formatWhen, stageBadgeColor, tierLabel } from "@/lib/outreach";
 import {
   CalendarIcon,
   Dot,
@@ -185,7 +185,7 @@ export default function CustomerDetailsPanel({
             </Badge>
             <MetaRule />
             <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400">
-              {profile.engagement_tier} engagement
+              {tierLabel(profile.engagement_tier)}
             </span>
           </div>
 

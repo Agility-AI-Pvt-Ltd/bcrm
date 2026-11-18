@@ -47,6 +47,9 @@ import LeadTileDetails from "@/components/campaigns/LeadTileDetails";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
 import {
+  BAND_HINTS,
+  BAND_LABELS,
+  INTEREST_BANDS,
   bandBadgeColor,
   interestBand,
   interestLabel,
@@ -62,6 +65,7 @@ import {
   markCallbackCalled,
   stageBadgeColor,
   tierBadgeColor,
+  tierLabel,
   type Lead,
   type LeadPage as LeadPageData,
   type LeadPeriod,
@@ -78,20 +82,23 @@ type LeadScope = "replied" | "all";
 
 /** The four headline tiles that open a list of the people they count.
  *  Reply rate is a ratio, not a list, so it stays a plain card. */
-type HeadlineKey = "waiting" | "leads" | "conversation" | "visits";
+type HeadlineKey = "waiting" | "needs_call" | "leads" | "conversation" | "visits";
 
 // The same tier means something different depending on the scope: among people
 // who wrote back, `low` is close to an opt-out; across everyone, `low` is simply
 // everyone still silent. Showing one wording in both places made the board lie.
 const TIER_HINTS: Record<LeadScope, Record<string, string>> = {
+  // "high" is engagement, not the interest score: 3+ replies, 2 replies with
+  // some interest, a score of 60+, or a visit/negotiation. A low score with
+  // many replies is still high here; the score column shows interest.
   replied: {
-    high: "Replied more than once, or already deep in the funnel — call first",
-    medium: "Replied once — keep the conversation warm",
+    high: "Talking a lot, keen, or at a visit — call first",
+    medium: "Replied, but no strong sign yet — keep it warm",
     low: "Graded low despite replying — usually an opt-out",
   },
   all: {
-    high: "Replied more than once — call these first",
-    medium: "Replied once — keep the conversation going",
+    high: "Talking a lot, keen, or at a visit — call first",
+    medium: "Replied, but no strong sign yet — keep it going",
     low: "No reply yet — the AI keeps following up",
   },
 };
@@ -113,6 +120,8 @@ export default function LeadsPage() {
   const [stage, setStage] = useState("");
   const [tier, setTier] = useState("");
   const [awaitingOnly, setAwaitingOnly] = useState(false);
+  const [needsCallOnly, setNeedsCallOnly] = useState(false);
+  const [band, setBand] = useState("");
   const [multiReply, setMultiReply] = useState(false);
   /** Which tile's list is open under the tiles, if any. */
   const [openTile, setOpenTile] = useState<HeadlineKey | null>(null);
@@ -163,6 +172,8 @@ export default function LeadsPage() {
           stage: stage || undefined,
           tier: tier || undefined,
           awaitingCallback: awaitingOnly || undefined,
+          needsCall: needsCallOnly || undefined,
+          band: band || undefined,
           multiReply: multiReply || undefined,
           search: search || undefined,
           period,
@@ -175,7 +186,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [scope, stage, tier, awaitingOnly, multiReply, search, period, offset]);
+  }, [scope, stage, tier, awaitingOnly, needsCallOnly, band, multiReply, search, period, offset]);
 
   useEffect(() => {
     void loadSnapshot();
@@ -225,6 +236,7 @@ export default function LeadsPage() {
   const counts = snapshot?.counts ?? {};
   const tiers = snapshot?.tiers?.length ? snapshot.tiers : [...ENGAGEMENT_TIERS];
   const waiting = counts.callback_waiting ?? 0;
+  const needsCall = counts.needs_call ?? 0;
 
   // Someone who replies is advanced to at least `Replied`, so in the replied
   // scope the earlier stages would only ever render an empty filter. Across
@@ -270,8 +282,10 @@ export default function LeadsPage() {
   const stats = useMemo(() => {
     const values = snapshot?.counts ?? {};
     const leads = values.replied ?? 0;
-    const everyone = values.total ?? 0;
-    const rate = everyone ? Math.round((leads / everyone) * 100) : 0;
+    // Replies out of people actually messaged; every contact in the list
+    // (most never messaged) made this read near 0% or, filtered, near 100%.
+    const contacted = values.contacted ?? values.total ?? 0;
+    const rate = contacted ? Math.round((leads / contacted) * 100) : null;
     return [
       {
         key: "leads" as const,
@@ -296,9 +310,9 @@ export default function LeadsPage() {
       },
       {
         key: null,
-        value: `${rate}%`,
+        value: rate === null ? "—" : `${rate}%`,
         label: "Reply rate",
-        hint: `${leads} of ${everyone} contact(s) answered`,
+        hint: rate === null ? "Nothing sent in this period" : `${leads} of ${contacted} messaged answered`,
         activeHint: "",
       },
     ];
@@ -338,9 +352,12 @@ export default function LeadsPage() {
     setTier("");
     setSearchInput("");
     setAwaitingOnly(key === "waiting");
+    setNeedsCallOnly(key === "needs_call");
+    setBand("");
     setMultiReply(key === "conversation");
     setStage(key === "visits" ? "Visit Scheduled" : "");
     setScope(key === "waiting" || key === "visits" ? "all" : "replied");
+    // "Needs a call" counts repliers only, so the replied scope already matches.
     setOpenTile(null);
     requestAnimationFrame(() =>
       tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
@@ -349,16 +366,20 @@ export default function LeadsPage() {
 
   const headlineActive: Record<HeadlineKey, boolean> = {
     waiting: openTile === "waiting",
+    needs_call: openTile === "needs_call",
     conversation: openTile === "conversation",
     visits: openTile === "visits",
     leads: openTile === "leads",
   };
 
-  const filtered = Boolean(stage || tier || search || awaitingOnly || multiReply);
+  const filtered = Boolean(
+    stage || tier || search || awaitingOnly || needsCallOnly || band || multiReply,
+  );
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Leads" />
+      {/* "Home" as in the menu: one name for one page. The list on it is leads. */}
+      <PageBreadcrumb pageTitle="Home" />
 
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -442,7 +463,10 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* Call now: the people owed a phone call, at the top because the next
+          action is a call, not reading analytics. The counts follow below. */}
+      <h2 className="mb-2 text-sm font-semibold text-gray-800 dark:text-white/90">Call now</h2>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* First card: everyone here was promised a phone call by the assistant,
             so this is the one number on the page that represents work already
             owed to a customer. The other three counts are the same kind of
@@ -477,6 +501,34 @@ export default function LeadsPage() {
                 : "Nobody is waiting to be phoned"}
           </p>
         </button>
+        {/* Everyone who replied and has not been phoned — the lead that goes
+            cold while "Waiting for a call" (callback requests only) reads 0. */}
+        <button
+          type="button"
+          onClick={() => toggleTile("needs_call")}
+          aria-expanded={headlineActive.needs_call}
+          aria-controls="lead-tile-details"
+          className={`rounded-2xl border p-5 text-left transition ${
+            headlineActive.needs_call
+              ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
+              : needsCall > 0
+                ? "border-error-300 bg-error-50 hover:border-error-400 dark:border-error-500/40 dark:bg-error-500/10"
+                : "border-gray-200 bg-white hover:border-brand-300 dark:border-gray-800 dark:bg-white/[0.03]"
+          }`}
+        >
+          <p className="text-2xl font-semibold text-gray-800 dark:text-white/90">{needsCall}</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Needs a call</p>
+          <p className="mt-1 text-[11px] leading-snug text-gray-400">
+            {headlineActive.needs_call
+              ? "Listed below — click to close"
+              : needsCall > 0
+                ? "Replied, never phoned — longest wait first, every period"
+                : "Everyone who replied has been phoned"}
+          </p>
+        </button>
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((card) => {
           const active = card.key ? headlineActive[card.key] : false;
           const className = `rounded-2xl border p-5 text-left transition ${
@@ -536,7 +588,60 @@ export default function LeadsPage() {
         />
       ) : null}
 
-      {/* Warmth first: it is the column that decides who gets called today. */}
+      {/* Interest, counted by the same function as Messages' "Hot" over every
+          lead who replied, so the two screens show the same number. Whatever
+          the period: a score is where a lead stands now. */}
+      <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+        Interest — how keen they are to rent or buy. All leads, every period; the same Hot count
+        as Messages.
+        {(counts.interest_unscored ?? 0) > 0
+          ? ` ${counts.interest_unscored} not scored yet.`
+          : ""}
+      </p>
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {INTEREST_BANDS.map((name) => {
+          const active = band === name;
+          return (
+            <button
+              key={name}
+              type="button"
+              onClick={() => {
+                setBand(active ? "" : name);
+                setOffset(0);
+                if (!active) {
+                  setScope("replied");
+                  requestAnimationFrame(() =>
+                    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                  );
+                }
+              }}
+              className={`rounded-2xl border p-4 text-left transition ${
+                active
+                  ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
+                  : "border-gray-200 bg-white hover:border-brand-300 dark:border-gray-800 dark:bg-white/[0.03]"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Badge color={bandBadgeColor(name)} size="sm">
+                  {BAND_LABELS[name]}
+                </Badge>
+                <span className="text-lg font-semibold text-gray-800 dark:text-white/90">
+                  {counts[`interest_${name}`] ?? 0}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[11px] leading-snug text-gray-500">{BAND_HINTS[name]}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Engagement, not interest: how much they reply. Said in a line, because
+          "Very active" beside a Cold score is correct and should not look like
+          a contradiction. */}
+      <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+        Engagement — how much they reply. Separate from the interest score (Hot / Warm / Cold)
+        in the table: a chatty lead can still be cold on buying.
+      </p>
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {tiers.map((name) => {
           const active = tier === name;
@@ -544,7 +649,18 @@ export default function LeadsPage() {
             <button
               key={name}
               type="button"
-              onClick={() => setFilter(stage, active ? "" : name)}
+              onClick={() => {
+                setFilter(stage, active ? "" : name);
+                // The count covers everyone, so show everyone, and bring the
+                // list into view: the table is below the fold, so the click
+                // otherwise looked like it did nothing.
+                if (!active) {
+                  setScope("all");
+                  requestAnimationFrame(() =>
+                    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                  );
+                }
+              }}
               className={`rounded-2xl border p-4 text-left transition ${
                 active
                   ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
@@ -553,7 +669,7 @@ export default function LeadsPage() {
             >
               <div className="flex items-center gap-2">
                 <Badge color={tierBadgeColor(name)} size="sm">
-                  {name}
+                  {tierLabel(name)}
                 </Badge>
                 <span className="text-lg font-semibold text-gray-800 dark:text-white/90">
                   {counts[name] ?? 0}
@@ -583,12 +699,22 @@ export default function LeadsPage() {
             ) : null}
             {tier ? (
               <Badge color={tierBadgeColor(tier)} size="sm">
-                {tier}
+                {tierLabel(tier)}
               </Badge>
             ) : null}
             {awaitingOnly ? (
               <Badge color="warning" size="sm">
                 Waiting for a call
+              </Badge>
+            ) : null}
+            {needsCallOnly ? (
+              <Badge color="error" size="sm">
+                Needs a call
+              </Badge>
+            ) : null}
+            {band ? (
+              <Badge color={bandBadgeColor(band)} size="sm">
+                {BAND_LABELS[band]} interest
               </Badge>
             ) : null}
             {multiReply ? (
@@ -602,6 +728,8 @@ export default function LeadsPage() {
                 onClick={() => {
                   setFilter("", "");
                   setAwaitingOnly(false);
+                  setNeedsCallOnly(false);
+                  setBand("");
                   setMultiReply(false);
                   setSearchInput("");
                 }}
@@ -611,13 +739,13 @@ export default function LeadsPage() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
             <input
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="Search name, phone or what they said"
-              className="w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-transparent dark:text-gray-300"
+              className="w-full sm:w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-transparent dark:text-gray-300"
             />
             <span className="text-xs text-gray-500">{page?.total ?? 0} matching</span>
           </div>
@@ -691,6 +819,8 @@ export default function LeadsPage() {
                   <td colSpan={10} className="px-5 py-10 text-center text-gray-500">
                     {awaitingOnly
                       ? "Nobody is waiting for a call right now."
+                      : needsCallOnly
+                        ? "Everyone who replied has been phoned."
                       : multiReply
                         ? "Nobody has written back more than once."
                         : filtered
@@ -777,7 +907,8 @@ function LeadScore({ score }: { score: number | null }) {
   return (
     <span title={interestLabel(score)}>
       <Badge color={bandBadgeColor(band)} size="sm">
-        {score}
+        {/* The word first: it is what an agent acts on; the number is detail. */}
+        {BAND_LABELS[band]} · {score}
       </Badge>
     </span>
   );
@@ -800,6 +931,9 @@ function LeadRow({
     .join(" · ");
   const chat = whatsappHref(lead.phone);
   const waitingSince = lead.callback_requested_at;
+  // Replied and never phoned: said in red with how long they have waited, so
+  // the age is read in the same glance as the name (the checklist's P0-1).
+  const uncalled = !waitingSince && lead.needs_call;
 
   return (
     <tr className={waitingSince ? "bg-amber-50/50 dark:bg-amber-500/[0.04]" : undefined}>
@@ -813,14 +947,25 @@ function LeadRow({
           {lead.name || "Unnamed"}
         </button>
         {chat ? (
-          <a
-            href={chat}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-brand-500 hover:text-brand-600"
-          >
-            {lead.phone}
-          </a>
+          <span className="flex items-center gap-2 text-xs">
+            <a
+              href={chat}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-brand-500 hover:text-brand-600"
+              title="Open in WhatsApp"
+            >
+              {lead.phone}
+            </a>
+            {/* One tap to call from a phone; on a laptop it hands off to a dialler. */}
+            <a
+              href={`tel:${String(lead.phone).replace(/[^\d+]/g, "")}`}
+              className="rounded-full border border-brand-200 px-2 py-0.5 font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-500/30 dark:text-brand-400"
+              aria-label={`Call ${lead.name || lead.phone}`}
+            >
+              Call
+            </a>
+          </span>
         ) : (
           <p className="text-xs text-gray-500">{lead.phone || lead.email || "—"}</p>
         )}
@@ -833,6 +978,13 @@ function LeadRow({
             title={`Asked for a call ${formatWhen(waitingSince)}`}
           >
             Waiting for a call · {formatSince(waitingSince)}
+          </p>
+        ) : uncalled ? (
+          <p
+            className="mt-1.5 inline-flex rounded-full bg-error-100 px-2 py-0.5 text-[11px] font-medium text-error-700 dark:bg-error-500/15 dark:text-error-300"
+            title={`Replied ${formatWhen(lead.last_reply_at)} and nobody has phoned them`}
+          >
+            Needs a call · replied {formatSince(lead.last_reply_at)}
           </p>
         ) : null}
       </td>
@@ -864,7 +1016,7 @@ function LeadRow({
       <td className="hidden px-5 py-3 min-[1320px]:table-cell">
         <div className="flex items-center gap-2">
           <Badge color={tierBadgeColor(lead.engagement_tier)} size="sm">
-            {lead.engagement_tier}
+            {tierLabel(lead.engagement_tier)}
           </Badge>
           {lead.outreach_paused ? (
             <span
@@ -901,7 +1053,7 @@ function LeadRow({
         {formatSince(lead.last_reply_at)}
       </td>
       <td className="px-5 py-3">
-        {waitingSince ? (
+        {waitingSince || uncalled ? (
           <button
             type="button"
             disabled={marking}

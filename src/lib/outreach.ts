@@ -233,6 +233,11 @@ export type Lead = {
    * who asked yesterday need different urgency.
    */
   callback_requested_at: string | null;
+  /**
+   * Replied, and nobody has phoned them: no call that connected or has an
+   * outcome, and no "Mark called". Separate from a callback request.
+   */
+  needs_call?: boolean;
   preferred_location: string | null;
   bhk: string | null;
   budget_label: string | null;
@@ -403,6 +408,10 @@ export async function listLeads(
     replied?: boolean;
     awaitingCallback?: boolean;
     multiReply?: boolean;
+    /** Replied and never phoned, longest wait first, whatever the period. */
+    needsCall?: boolean;
+    /** hot / warm / cool / cold: the same rows as Messages' band filter. */
+    band?: string;
     search?: string;
     /** Today / this week / this month, matched on last activity. */
     period?: LeadPeriod;
@@ -416,6 +425,8 @@ export async function listLeads(
   if (params.replied) query.set("replied", "true");
   if (params.awaitingCallback) query.set("awaiting_callback", "true");
   if (params.multiReply) query.set("multi_reply", "true");
+  if (params.needsCall) query.set("needs_call", "true");
+  if (params.band) query.set("band", params.band);
   if (params.search) query.set("search", params.search);
   if (params.period && params.period !== "all") query.set("period", params.period);
   query.set("limit", String(params.limit ?? 50));
@@ -602,11 +613,31 @@ export function stageBadgeColor(
   }
 }
 
+/**
+ * Engagement says how much someone talks to us; the interest score says how
+ * keen they are to rent or buy. They are different measures and can disagree:
+ * three replies and a score of 8 is "Very active" and "Cold", and both are
+ * true. Shown as "high" in green beside a green "hot", they read as one grade
+ * contradicting itself, so engagement gets its own words and its own colours.
+ */
+export const TIER_LABELS: Record<string, string> = {
+  high: "Very active",
+  medium: "Active",
+  low: "Quiet",
+};
+
+export function tierLabel(tier: string | null | undefined): string {
+  const key = String(tier || "").toLowerCase();
+  return TIER_LABELS[key] ?? (key || "—");
+}
+
 export function tierBadgeColor(
   tier: string,
 ): "primary" | "success" | "error" | "warning" | "info" | "light" | "dark" {
-  if (tier === "high") return "success";
-  if (tier === "medium") return "warning";
+  // Blues, so nothing here can be mistaken for the interest colours (green
+  // hot, amber warm) in the score column next to it.
+  if (tier === "high") return "primary";
+  if (tier === "medium") return "info";
   return "light";
 }
 
