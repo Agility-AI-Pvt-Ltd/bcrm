@@ -34,6 +34,8 @@ export type VisitView = {
   when_label: string;
   /** What this visit is still waiting for, in the order a broker would do it. */
   outstanding: string[];
+  /** Each reminder's state and why: sent, due, skipped, failed, missed or off. */
+  reminders?: ReminderState[];
 };
 
 export type VisitSlot = {
@@ -53,6 +55,14 @@ export type VisitEvent = {
   /** The customer's own words, when this was read out of a chat or a call. */
   evidence: string | null;
   created_at: string;
+};
+
+export type ReminderState = {
+  kind: string;
+  label: string;
+  state: "sent" | "due" | "skipped" | "failed" | "missed" | "off" | "waiting";
+  /** In words: "Sent 16 Oct at 1:00 PM", "The reminder template is not approved…". */
+  detail: string;
 };
 
 export type Visit = {
@@ -134,6 +144,8 @@ export type VisitDetail = Visit & {
   timeline: VisitEvent[];
   slots: VisitSlot[];
   customer_notice?: CustomerNotice | null;
+  /** Fix-it-now notes from booking, e.g. a visit with no location pin. */
+  warnings?: string[];
 };
 
 export type VisitList = {

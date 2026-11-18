@@ -42,6 +42,9 @@ export default function SiteVisitsPage() {
   const [slots, setSlots] = useState<VisitSlot[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Kept apart from `error`, which every refresh clears: a booking warning must
+  // stay until the next booking or until it is dismissed.
+  const [warning, setWarning] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -104,8 +107,9 @@ export default function SiteVisitsPage() {
     }
     setAdding(true);
     setError("");
+    setWarning("");
     try {
-      await createVisit({
+      const booked = await createVisit({
         customer_phone: form.phone.trim(),
         customer_name: form.name.trim() || null,
         slot_id: form.slot || null,
@@ -113,7 +117,10 @@ export default function SiteVisitsPage() {
       });
       setForm({ phone: "", name: "", slot: "", notes: "" });
       setShowAdd(false);
-      setNotice("Visit booked.");
+      // A warning (no location pin) stays on screen, not a notice that fades
+      // after four seconds.
+      if (booked?.warnings?.length) setWarning(`Visit booked. ${booked.warnings.join(" ")}`);
+      else setNotice("Visit booked.");
       await load();
     } catch (err) {
       // A full slot comes back with free ones to use instead.
@@ -138,7 +145,7 @@ export default function SiteVisitsPage() {
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">Site visits</h3>
             <p className="mt-1 max-w-2xl text-sm text-gray-500 dark:text-gray-400">
               Every visit from slot to feedback: booked on WhatsApp or from a call, reminded the
-              day before and two hours before with the location pin, checked in when they arrive,
+              day before and again shortly before with the location pin, checked in when they arrive,
               and reviewed afterwards.
             </p>
           </div>
@@ -198,6 +205,18 @@ export default function SiteVisitsPage() {
 
         {error ? <p className="mt-4 text-sm text-error-500">{error}</p> : null}
         {notice ? <p className="mt-4 text-sm text-success-600">{notice}</p> : null}
+        {warning ? (
+          <p className="mt-4 flex items-start gap-3 rounded-lg border border-warning-200 bg-warning-50 px-3 py-2 text-sm text-warning-700 dark:border-warning-500/30 dark:bg-warning-500/10 dark:text-warning-400">
+            <span className="flex-1">{warning}</span>
+            <button
+              type="button"
+              onClick={() => setWarning("")}
+              className="text-xs font-medium underline"
+            >
+              Dismiss
+            </button>
+          </p>
+        ) : null}
 
         {showAdd ? (
           <form
