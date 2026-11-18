@@ -61,13 +61,33 @@ export default function PropertiesPage() {
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<Tab>("inventory");
   const [source, setSource] = useState<Source>("whatsapp");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [listingType, setListingType] = useState("");
+  const [bhk, setBhk] = useState("");
+  const [maxBudget, setMaxBudget] = useState("");
+  const filtering = Boolean(search || listingType || bhk || maxBudget);
+
+  // Typing searches after a pause, not on every key.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const [result, propertyStats] = await Promise.all([
-        listProperties(page, PAGE_SIZE),
+        listProperties(page, PAGE_SIZE, {
+          search,
+          listingType,
+          bhk,
+          maxBudget: Number(maxBudget) || undefined,
+        }),
         getPropertyStats(),
       ]);
       // A sync or delete can shrink the list under the current page; step
@@ -88,7 +108,7 @@ export default function PropertiesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, search, listingType, bhk, maxBudget]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const firstRow = (page - 1) * PAGE_SIZE + 1;
@@ -184,9 +204,82 @@ export default function PropertiesPage() {
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {loading
                   ? "Loading listings from the database…"
-                  : `${total} listing${total === 1 ? "" : "s"} in this organization.`}
+                  : filtering
+                    ? `${total} listing${total === 1 ? "" : "s"} match.`
+                    : `${total} listing${total === 1 ? "" : "s"} in this organization.`}
               </p>
             </div>
+          </div>
+
+          {/* Search and the three questions a broker filters by while a customer
+              waits: rent or buy, how many bedrooms, and the budget ceiling. */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 px-5 py-3 dark:border-gray-800">
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Search name, area or type"
+              aria-label="Search properties"
+              className="h-9 w-full rounded-lg border border-gray-300 bg-transparent px-3 text-sm sm:w-64 dark:border-gray-700 dark:text-white/90"
+            />
+            <select
+              value={listingType}
+              onChange={(event) => {
+                setListingType(event.target.value);
+                setPage(1);
+              }}
+              aria-label="Rent or sale"
+              className="h-9 rounded-lg border border-gray-300 bg-transparent px-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            >
+              <option value="">Rent or sale</option>
+              <option value="rent">Rent</option>
+              <option value="sale">Sale</option>
+            </select>
+            <select
+              value={bhk}
+              onChange={(event) => {
+                setBhk(event.target.value);
+                setPage(1);
+              }}
+              aria-label="Bedrooms"
+              className="h-9 rounded-lg border border-gray-300 bg-transparent px-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+            >
+              <option value="">Any BHK</option>
+              {["1", "2", "3", "4", "5"].map((rooms) => (
+                <option key={rooms} value={rooms}>
+                  {rooms} BHK
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={maxBudget}
+              onChange={(event) => {
+                setMaxBudget(event.target.value);
+                setPage(1);
+              }}
+              placeholder={listingType === "rent" ? "Max rent ₹/month" : "Max budget ₹"}
+              aria-label="Maximum budget in rupees"
+              className="h-9 w-40 rounded-lg border border-gray-300 bg-transparent px-3 text-sm dark:border-gray-700 dark:text-white/90"
+            />
+            {filtering || searchInput ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput("");
+                  setSearch("");
+                  setListingType("");
+                  setBhk("");
+                  setMaxBudget("");
+                  setPage(1);
+                }}
+                className="text-xs font-medium text-brand-500 hover:text-brand-600"
+              >
+                Clear
+              </button>
+            ) : null}
           </div>
 
           {error ? (
@@ -216,14 +309,31 @@ export default function PropertiesPage() {
                 ) : items.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-5 py-8 text-center text-gray-500 dark:text-gray-400">
-                      No properties in the database for this organization.
+                      {filtering
+                        ? "No listing matches these filters."
+                        : "No properties in the database for this organization."}
                     </td>
                   </tr>
                 ) : (
                   items.map((property) => (
                     <tr key={property.id}>
                       <td className="whitespace-nowrap px-5 py-4 font-medium text-gray-800 dark:text-white/90">
-                        {property.title}
+                        <span className="flex items-center gap-3">
+                          {property.image_urls?.[0] ? (
+                            // A thumbnail of the first photo: the quickest way to
+                            // tell two similar listings apart while a customer waits.
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={property.image_urls[0]}
+                              alt=""
+                              loading="lazy"
+                              className="h-10 w-14 shrink-0 rounded-md object-cover"
+                            />
+                          ) : (
+                            <span className="h-10 w-14 shrink-0 rounded-md bg-gray-100 dark:bg-white/[0.06]" />
+                          )}
+                          {property.title}
+                        </span>
                       </td>
                       <td className="px-5 py-4 text-gray-500 dark:text-gray-400">
                         {property.location}

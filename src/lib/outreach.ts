@@ -238,6 +238,11 @@ export type Lead = {
    * outcome, and no "Mark called". Separate from a callback request.
    */
   needs_call?: boolean;
+  /** Their current visit's time passed with nothing recorded (stage still says Visit Scheduled). */
+  visit_missed?: boolean;
+  /** Marked "Not a lead" (a broker, vendor, wrong number). Only set in that list. */
+  not_a_lead?: boolean;
+  not_lead_reason?: string | null;
   preferred_location: string | null;
   bhk: string | null;
   budget_label: string | null;
@@ -412,6 +417,10 @@ export async function listLeads(
     needsCall?: boolean;
     /** hot / warm / cool / cold: the same rows as Messages' band filter. */
     band?: string;
+    /** Has a visit still to come, whatever the period. */
+    upcomingVisit?: boolean;
+    /** Only the people marked "Not a lead" — every other list leaves them out. */
+    notLead?: boolean;
     search?: string;
     /** Today / this week / this month, matched on last activity. */
     period?: LeadPeriod;
@@ -427,6 +436,8 @@ export async function listLeads(
   if (params.multiReply) query.set("multi_reply", "true");
   if (params.needsCall) query.set("needs_call", "true");
   if (params.band) query.set("band", params.band);
+  if (params.upcomingVisit) query.set("upcoming_visit", "true");
+  if (params.notLead) query.set("not_lead", "true");
   if (params.search) query.set("search", params.search);
   if (params.period && params.period !== "all") query.set("period", params.period);
   query.set("limit", String(params.limit ?? 50));
@@ -450,6 +461,33 @@ export type CallbackMarkCalledResult = {
  * Safe to call twice — the backend closes whatever is open and returns
  * `marked: 0` when there was nothing left, rather than erroring.
  */
+/** Why someone is not a lead. Offered as one-tap choices; free text is accepted too. */
+export const NOT_LEAD_REASONS = [
+  "Broker or channel partner",
+  "Vendor or spam",
+  "Teammate or test",
+  "Wrong number",
+  "Already a customer",
+] as const;
+
+export type NotLeadResult = { contact_id: string; not_a_lead: boolean; reason?: string | null };
+
+/** Take someone out of every lead count and list. Their contact and chat stay. */
+export async function markNotLead(contactId: string, reason?: string) {
+  return apiFetch<NotLeadResult>(
+    `/api/v1/outreach/leads/${encodeURIComponent(contactId)}/not-a-lead`,
+    { method: "POST", body: JSON.stringify({ reason: reason ?? null }) },
+  );
+}
+
+/** Undo: back to a lead. */
+export async function unmarkNotLead(contactId: string) {
+  return apiFetch<NotLeadResult>(
+    `/api/v1/outreach/leads/${encodeURIComponent(contactId)}/not-a-lead`,
+    { method: "DELETE" },
+  );
+}
+
 export async function markCallbackCalled(contactId: string) {
   return apiFetch<CallbackMarkCalledResult>(
     `/api/v1/outreach/leads/${encodeURIComponent(contactId)}/callback/called`,

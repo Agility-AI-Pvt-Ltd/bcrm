@@ -63,6 +63,9 @@ import {
   getPipeline,
   listLeads,
   markCallbackCalled,
+  markNotLead,
+  NOT_LEAD_REASONS,
+  unmarkNotLead,
   stageBadgeColor,
   tierBadgeColor,
   tierLabel,
@@ -122,6 +125,11 @@ export default function LeadsPage() {
   const [awaitingOnly, setAwaitingOnly] = useState(false);
   const [needsCallOnly, setNeedsCallOnly] = useState(false);
   const [band, setBand] = useState("");
+  const [upcomingOnly, setUpcomingOnly] = useState(false);
+  /** The list of people marked "Not a lead", for checking and undoing. */
+  const [notLeadOnly, setNotLeadOnly] = useState(false);
+  /** The last one marked, so the toast can offer Undo. */
+  const [undoable, setUndoable] = useState<Lead | null>(null);
   const [multiReply, setMultiReply] = useState(false);
   /** Which tile's list is open under the tiles, if any. */
   const [openTile, setOpenTile] = useState<HeadlineKey | null>(null);
@@ -139,7 +147,10 @@ export default function LeadsPage() {
 
   useEffect(() => {
     if (!notice) return;
-    const timer = setTimeout(() => setNotice(""), 6000);
+    const timer = setTimeout(() => {
+      setNotice("");
+      setUndoable(null);
+    }, 6000);
     return () => clearTimeout(timer);
   }, [notice]);
 
@@ -174,6 +185,8 @@ export default function LeadsPage() {
           awaitingCallback: awaitingOnly || undefined,
           needsCall: needsCallOnly || undefined,
           band: band || undefined,
+          upcomingVisit: upcomingOnly || undefined,
+          notLead: notLeadOnly || undefined,
           multiReply: multiReply || undefined,
           search: search || undefined,
           period,
@@ -186,7 +199,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [scope, stage, tier, awaitingOnly, needsCallOnly, band, multiReply, search, period, offset]);
+  }, [scope, stage, tier, awaitingOnly, needsCallOnly, band, upcomingOnly, notLeadOnly, multiReply, search, period, offset]);
 
   useEffect(() => {
     void loadSnapshot();
@@ -231,6 +244,37 @@ export default function LeadsPage() {
       }
     },
     [reload],
+  );
+
+  /**
+   * "Not a lead": a broker, vendor or wrong number who replied. Out of every
+   * count and list at once; the toast offers Undo for six seconds, and the
+   * "Not leads" list keeps it undoable after that.
+   */
+  const setNotLead = useCallback(
+    async (lead: Lead, reason: string | null) => {
+      const who = lead.name || lead.phone || "This contact";
+      setMarkingId(lead.id);
+      try {
+        if (reason === null) {
+          await unmarkNotLead(lead.id);
+          setUndoable(null);
+          // The last one restored: nothing left in that list, so back to the leads.
+          if (notLeadOnly && (page?.total ?? 0) <= 1) setNotLeadOnly(false);
+          setNotice(`${who} is counted as a lead again.`);
+        } else {
+          await markNotLead(lead.id, reason);
+          setUndoable(lead);
+          setNotice(`${who} is no longer counted as a lead (${reason.toLowerCase()}).`);
+        }
+        reload();
+      } catch (error) {
+        setNotice(error instanceof ApiError ? error.message : "Could not save that.");
+      } finally {
+        setMarkingId("");
+      }
+    },
+    [reload, notLeadOnly, page?.total],
   );
 
   const counts = snapshot?.counts ?? {};
@@ -303,9 +347,11 @@ export default function LeadsPage() {
       },
       {
         key: "visits" as const,
-        value: String(values["Visit Scheduled"] ?? 0),
+        // Leads with a visit still to come. The stage count it replaced kept
+        // past and missed visits, because a stage never moves back.
+        value: String(values.visits_upcoming ?? values["Visit Scheduled"] ?? 0),
         label: "Visits scheduled",
-        hint: "Agreed to see a property",
+        hint: "A visit still to come — every period",
         activeHint: "Listed below — click to close",
       },
       {
@@ -355,7 +401,8 @@ export default function LeadsPage() {
     setNeedsCallOnly(key === "needs_call");
     setBand("");
     setMultiReply(key === "conversation");
-    setStage(key === "visits" ? "Visit Scheduled" : "");
+    setStage("");
+    setUpcomingOnly(key === "visits");
     setScope(key === "waiting" || key === "visits" ? "all" : "replied");
     // "Needs a call" counts repliers only, so the replied scope already matches.
     setOpenTile(null);
@@ -373,8 +420,17 @@ export default function LeadsPage() {
   };
 
   const filtered = Boolean(
-    stage || tier || search || awaitingOnly || needsCallOnly || band || multiReply,
+    stage ||
+      tier ||
+      search ||
+      awaitingOnly ||
+      needsCallOnly ||
+      band ||
+      upcomingOnly ||
+      notLeadOnly ||
+      multiReply,
   );
+  const notLeadCount = counts.not_lead ?? 0;
 
   return (
     <div>
@@ -712,6 +768,16 @@ export default function LeadsPage() {
                 Needs a call
               </Badge>
             ) : null}
+            {upcomingOnly ? (
+              <Badge color="info" size="sm">
+                Visit coming up
+              </Badge>
+            ) : null}
+            {notLeadOnly ? (
+              <Badge color="light" size="sm">
+                Not leads
+              </Badge>
+            ) : null}
             {band ? (
               <Badge color={bandBadgeColor(band)} size="sm">
                 {BAND_LABELS[band]} interest
@@ -730,6 +796,8 @@ export default function LeadsPage() {
                   setAwaitingOnly(false);
                   setNeedsCallOnly(false);
                   setBand("");
+                  setUpcomingOnly(false);
+                  setNotLeadOnly(false);
                   setMultiReply(false);
                   setSearchInput("");
                 }}
@@ -748,6 +816,23 @@ export default function LeadsPage() {
               className="w-full sm:w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-transparent dark:text-gray-300"
             />
             <span className="text-xs text-gray-500">{page?.total ?? 0} matching</span>
+            {notLeadCount > 0 || notLeadOnly ? (
+              // Out of every count, but never out of reach: this is where a
+              // marking is checked and undone.
+              <button
+                type="button"
+                onClick={() => {
+                  setNotLeadOnly((value) => !value);
+                  setOffset(0);
+                }}
+                title="People marked Not a lead — brokers, vendors, wrong numbers. Left out of every count."
+                className={`text-xs font-medium ${
+                  notLeadOnly ? "text-brand-600" : "text-gray-500 hover:text-brand-600"
+                }`}
+              >
+                {notLeadOnly ? "Back to leads" : `Not leads (${notLeadCount})`}
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -835,6 +920,7 @@ export default function LeadsPage() {
                     lead={lead}
                     marking={markingId === lead.id}
                     onMarkCalled={markCalled}
+                    onNotLead={setNotLead}
                     onOpen={setProfileOf}
                   />
                 ))
@@ -879,8 +965,17 @@ export default function LeadsPage() {
       ) : null}
 
       {notice && (
-        <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-theme-lg dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
-          {notice}
+        <div className="fixed bottom-5 right-5 z-50 flex max-w-sm items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-theme-lg dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+          <span className="flex-1">{notice}</span>
+          {undoable ? (
+            <button
+              type="button"
+              onClick={() => void setNotLead(undoable, null)}
+              className="font-medium text-brand-600 hover:text-brand-700"
+            >
+              Undo
+            </button>
+          ) : null}
         </div>
       )}
     </div>
@@ -918,11 +1013,14 @@ function LeadRow({
   lead,
   marking,
   onMarkCalled,
+  onNotLead,
   onOpen,
 }: {
   lead: Lead;
   marking: boolean;
   onMarkCalled: (lead: Lead) => void;
+  /** Mark with a reason, or `null` to make them a lead again. */
+  onNotLead: (lead: Lead, reason: string | null) => void;
   /** Open this customer's profile in the side drawer. */
   onOpen: (lead: Lead) => void;
 }) {
@@ -934,6 +1032,7 @@ function LeadRow({
   // Replied and never phoned: said in red with how long they have waited, so
   // the age is read in the same glance as the name (the checklist's P0-1).
   const uncalled = !waitingSince && lead.needs_call;
+  const [choosing, setChoosing] = useState(false);
 
   return (
     <tr className={waitingSince ? "bg-amber-50/50 dark:bg-amber-500/[0.04]" : undefined}>
@@ -1009,6 +1108,14 @@ function LeadRow({
         <Badge color={stageBadgeColor(lead.customer_stage)} size="sm">
           {lead.customer_stage}
         </Badge>
+        {lead.visit_missed ? (
+          // The stage cannot step back, so the missed visit is said beside it.
+          <span className="mt-1 block">
+            <Badge color="warning" size="sm">
+              Visit missed
+            </Badge>
+          </span>
+        ) : null}
       </td>
       <td className="px-5 py-3">
         <LeadScore score={lead.intent_score} />
@@ -1053,18 +1160,67 @@ function LeadRow({
         {formatSince(lead.last_reply_at)}
       </td>
       <td className="px-5 py-3">
-        {waitingSince || uncalled ? (
-          <button
-            type="button"
-            disabled={marking}
-            onClick={() => onMarkCalled(lead)}
-            title="Record that you phoned them and take them off the call list"
-            className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
-          >
-            {marking ? "Saving…" : "Mark called"}
-          </button>
+        {lead.not_a_lead ? (
+          <div className="flex flex-col items-start gap-1">
+            <Badge color="light" size="sm">
+              {lead.not_lead_reason || "Not a lead"}
+            </Badge>
+            <button
+              type="button"
+              disabled={marking}
+              onClick={() => onNotLead(lead, null)}
+              className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+            >
+              {marking ? "Saving…" : "It is a lead"}
+            </button>
+          </div>
+        ) : choosing ? (
+          <div className="flex flex-col items-start gap-1" role="group" aria-label="Why not a lead">
+            {NOT_LEAD_REASONS.map((reason) => (
+              <button
+                key={reason}
+                type="button"
+                disabled={marking}
+                onClick={() => {
+                  setChoosing(false);
+                  onNotLead(lead, reason);
+                }}
+                className="text-left text-xs text-gray-700 hover:text-brand-600 disabled:opacity-50 dark:text-gray-300"
+              >
+                {reason}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setChoosing(false)}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Cancel
+            </button>
+          </div>
         ) : (
-          <span className="text-gray-300 dark:text-gray-600">—</span>
+          <div className="flex flex-col items-start gap-1.5">
+            {waitingSince || uncalled ? (
+              <button
+                type="button"
+                disabled={marking}
+                onClick={() => onMarkCalled(lead)}
+                title="Record that you phoned them and take them off the call list"
+                className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
+              >
+                {marking ? "Saving…" : "Mark called"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={marking}
+              onClick={() => setChoosing(true)}
+              title="A broker, vendor or wrong number: leave them out of every lead count and list"
+              className="text-[11px] text-gray-400 hover:text-gray-600 disabled:opacity-50 dark:hover:text-gray-300"
+            >
+              Not a lead
+            </button>
+          </div>
         )}
       </td>
     </tr>

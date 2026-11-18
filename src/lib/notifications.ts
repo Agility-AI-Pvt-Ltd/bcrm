@@ -14,7 +14,9 @@ export type NotificationKind =
   | "call_answered"
   | "call_completed"
   | "visit_booked"
-  | "callback_requested";
+  | "callback_requested"
+  | "reply_failed"
+  | "connection_lost";
 
 export type OrgNotification = {
   id: string;
@@ -114,7 +116,10 @@ export function relativeTime(iso: string, now = Date.now()): string {
 
 export function statusDotClass(item: OrgNotification): string {
   if (!item.viewed) {
-    return item.kind === "callback_requested" || item.kind === "visit_booked"
+    return item.kind === "callback_requested" ||
+      item.kind === "visit_booked" ||
+      item.kind === "reply_failed" ||
+      item.kind === "connection_lost"
       ? "bg-error-500"
       : "bg-success-500";
   }

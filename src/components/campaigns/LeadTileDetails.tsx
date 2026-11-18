@@ -56,7 +56,7 @@ const EMPTY: Record<TileKey, string> = {
   needs_call: "Everyone who replied has been phoned.",
   leads: "Nobody has replied in this period yet.",
   conversation: "Nobody has written back more than once in this period.",
-  visits: "No visits are scheduled in this period.",
+  visits: "No visits coming up.",
 };
 
 const TONE_BADGE = {
@@ -144,7 +144,8 @@ function filterFor(key: TileKey) {
     case "conversation":
       return { multiReply: true };
     case "visits":
-      return { stage: "Visit Scheduled" };
+      // Visits still to come, not a stage that stays after the visit is over.
+      return { upcomingVisit: true };
     default:
       return { replied: true };
   }
@@ -226,7 +227,9 @@ export default function LeadTileDetails({
   }, [onClose, profileOf]);
 
   const scopeNote =
-    tile === "waiting" || tile === "needs_call"
+    tile === "visits"
+      ? "Every period — any visit still to come is shown whatever window is selected."
+      : tile === "waiting" || tile === "needs_call"
       ? "Every period — a call still owed is shown whatever window is selected."
       : period === "all"
         ? "All time"

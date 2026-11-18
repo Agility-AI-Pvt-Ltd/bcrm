@@ -73,6 +73,22 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
+const REMINDER_MARK: Record<string, string> = {
+  sent: "✓",
+  failed: "✕",
+  missed: "!",
+  skipped: "–",
+  off: "–",
+  due: "○",
+  waiting: "○",
+};
+
+const REMINDER_TONE: Record<string, string> = {
+  sent: "text-success-600",
+  failed: "text-error-600",
+  missed: "text-warning-600",
+};
+
 export default function VisitCard({
   visit,
   onChanged,
@@ -263,16 +279,29 @@ export default function VisitCard({
           </span>
         </Fact>
         <Fact label="Reminders">
-          <span className="text-xs">
-            <span className={current.reminder_24h_sent_at ? "text-success-600" : "text-gray-500"}>
-              {current.reminder_24h_sent_at ? "✓" : "○"} day before
+          {current.view?.reminders?.length ? (
+            // Each line says why, so an empty circle is never a mystery: due
+            // later, skipped (booked inside the window), failed, or switched off.
+            <span className="text-xs">
+              {current.view.reminders.map((reminder) => (
+                <span key={reminder.kind} className={`block ${REMINDER_TONE[reminder.state] ?? "text-gray-500"}`}>
+                  {REMINDER_MARK[reminder.state] ?? "○"} {reminder.label}
+                  <span className="block pl-4 text-[11px] text-gray-500">{reminder.detail}</span>
+                </span>
+              ))}
             </span>
-            <span className="block">
-              <span className={current.reminder_2h_sent_at ? "text-success-600" : "text-gray-500"}>
-                {current.reminder_2h_sent_at ? "✓" : "○"} near the time
+          ) : (
+            <span className="text-xs">
+              <span className={current.reminder_24h_sent_at ? "text-success-600" : "text-gray-500"}>
+                {current.reminder_24h_sent_at ? "✓" : "○"} day before
+              </span>
+              <span className="block">
+                <span className={current.reminder_2h_sent_at ? "text-success-600" : "text-gray-500"}>
+                  {current.reminder_2h_sent_at ? "✓" : "○"} near the time
+                </span>
               </span>
             </span>
-          </span>
+          )}
         </Fact>
         <Fact label="Location pin">
           {pinReady ? (

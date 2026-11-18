@@ -11,6 +11,7 @@ import {
   type AuthUser,
 } from "@/lib/auth";
 import { isAllowedWhenDisabled } from "@/lib/access";
+import { useStoredUser } from "@/hooks/useStoredUser";
 
 /**
  * What we know about the caller. `checking` is the only state that renders a
@@ -42,6 +43,16 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [gate, setGate] = useState<Gate>({ state: "checking" });
+  // The user remembered from the last visit. Until /auth/me answers, the gate
+  // decides from it instead of covering the screen: every reload, new tab or
+  // link from outside used to blank the whole app, sidebar included, for a
+  // round trip. Null during server render and hydration (see useStoredUser), so
+  // that first pass still shows the placeholder and nothing mismatches.
+  const remembered = useStoredUser();
+  const decided: Gate =
+    gate.state === "checking" && remembered && getAccessToken()
+      ? { state: "known", user: remembered }
+      : gate;
 
   useEffect(() => {
     let cancelled = false;
@@ -78,9 +89,13 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     };
   }, [pathname]);
 
+  // The same check whether the user came from the server or from memory, so an
+  // unverified account is still sent to /plans before any page is drawn. A
+  // remembered "verified" that the server has since revoked shows for one round
+  // trip at most; the API refuses that account's data regardless.
   const blocked =
-    gate.state === "known" &&
-    !gate.user.is_enabled &&
+    decided.state === "known" &&
+    !decided.user.is_enabled &&
     !isAllowedWhenDisabled(pathname);
 
   useEffect(() => {
@@ -91,12 +106,12 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     if (blocked) router.replace("/plans");
   }, [blocked, router]);
 
-  if (gate.state !== "known" || blocked) {
+  if (decided.state !== "known" || blocked) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-white text-sm text-gray-500 dark:bg-gray-900">
         {blocked
           ? "Your account is awaiting verification…"
-          : gate.state === "guest"
+          : decided.state === "guest"
             ? "Redirecting to sign in…"
             : "Checking your account…"}
       </div>
