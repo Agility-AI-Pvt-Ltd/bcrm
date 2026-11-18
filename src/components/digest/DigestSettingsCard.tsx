@@ -153,7 +153,9 @@ export default function DigestSettingsCard({ onChanged }: Props) {
         </div>
         <div className="rounded-xl border border-gray-200 px-3 py-2.5 dark:border-gray-800">
           <dt className="text-xs text-gray-500 dark:text-gray-400">
-            <code>{settings.template_name}</code> template
+            {/* The template's internal name is only needed when it must be
+                submitted, so it appears in that warning below, not here. */}
+            Morning message
           </dt>
           <dd
             className={`mt-0.5 text-sm font-medium ${

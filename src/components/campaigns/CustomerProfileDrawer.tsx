@@ -16,7 +16,7 @@ import { useEffect, useState } from "react";
 import CustomerDetailsPanel from "@/components/messages/CustomerDetailsPanel";
 import { ApiError } from "@/lib/api";
 import { getThreadForContact, type InboxThreadDetail } from "@/lib/inbox";
-import type { Lead } from "@/lib/outreach";
+import { tierLabel, type Lead } from "@/lib/outreach";
 
 export default function CustomerProfileDrawer({
   lead,
@@ -113,7 +113,7 @@ export default function CustomerProfileDrawer({
               <dl className="space-y-1.5 text-xs">
                 {[
                   ["Stage", lead.customer_stage],
-                  ["Engagement", lead.engagement_tier],
+                  ["Engagement", tierLabel(lead.engagement_tier)],
                   ["Interest score", lead.intent_score === null ? null : String(lead.intent_score)],
                   ["Looking for", wants.join(" · ") || null],
                   ["Last reply", lead.last_reply_text],

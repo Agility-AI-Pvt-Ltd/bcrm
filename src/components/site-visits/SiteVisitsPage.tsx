@@ -24,7 +24,8 @@ const TABS: { scope: VisitScope; label: string }[] = [
 const EMPTY: Record<VisitScope, string> = {
   today: "No visits today.",
   upcoming: "No visits booked yet. The AI books them from WhatsApp, or add one below.",
-  needs_attention: "Nothing waiting — every visit has a slot, a pin and an outcome.",
+  needs_attention:
+    "Nothing waiting — every visit has a slot, an outcome, and a location pin if it is within a day.",
   past: "No past visits yet.",
   all: "No visits yet.",
   // Never shown: `range` is what the calendar asks for, and an empty window
@@ -46,16 +47,23 @@ export default function SiteVisitsPage() {
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ phone: "", name: "", slot: "", notes: "" });
   const mounted = useRef(true);
+  // Only the newest load may write the list. Switching tabs while a load (or
+  // the 20 s refresh) for the old tab was still running let the old answer land
+  // last: a "Needs attention" badge of 2 above another tab's empty list.
+  const latest = useRef(0);
 
   const load = useCallback(async () => {
+    const request = ++latest.current;
     try {
       const [visits, free] = await Promise.all([getVisits(scope), getVisitSlots(24)]);
-      if (!mounted.current) return;
+      if (!mounted.current || request !== latest.current) return;
       setList(visits);
       setSlots(free);
       setError("");
     } catch (err) {
-      if (mounted.current) setError(failureText(err, "Could not load site visits."));
+      if (mounted.current && request === latest.current) {
+        setError(failureText(err, "Could not load site visits."));
+      }
     }
   }, [scope]);
 

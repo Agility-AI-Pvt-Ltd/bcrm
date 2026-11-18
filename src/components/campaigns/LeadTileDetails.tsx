@@ -38,13 +38,14 @@ import {
 } from "@/lib/outreach";
 import { getVisits, getVisitsForContacts, type ContactVisit, type Visit } from "@/lib/siteVisits";
 
-export type TileKey = "waiting" | "leads" | "conversation" | "visits";
+export type TileKey = "waiting" | "needs_call" | "leads" | "conversation" | "visits";
 
 /** Enough to scan at a glance; the rest are one click away in the table. */
 const PANEL_LIMIT = 25;
 
 const TITLES: Record<TileKey, string> = {
   waiting: "Waiting for a call",
+  needs_call: "Needs a call",
   leads: "Leads",
   conversation: "In conversation",
   visits: "Visits scheduled",
@@ -52,6 +53,7 @@ const TITLES: Record<TileKey, string> = {
 
 const EMPTY: Record<TileKey, string> = {
   waiting: "Nobody is waiting to be phoned.",
+  needs_call: "Everyone who replied has been phoned.",
   leads: "Nobody has replied in this period yet.",
   conversation: "Nobody has written back more than once in this period.",
   visits: "No visits are scheduled in this period.",
@@ -137,6 +139,8 @@ function filterFor(key: TileKey) {
   switch (key) {
     case "waiting":
       return { awaitingCallback: true };
+    case "needs_call":
+      return { needsCall: true };
     case "conversation":
       return { multiReply: true };
     case "visits":
@@ -222,7 +226,7 @@ export default function LeadTileDetails({
   }, [onClose, profileOf]);
 
   const scopeNote =
-    tile === "waiting"
+    tile === "waiting" || tile === "needs_call"
       ? "Every period — a call still owed is shown whatever window is selected."
       : period === "all"
         ? "All time"
@@ -408,6 +412,7 @@ function DetailRow({
                 ? `Asked for a call ${formatSince(lead.callback_requested_at)} · `
                 : ""}
               {tile === "conversation" ? `${lead.reply_count} replies · ` : ""}
+              {tile === "needs_call" ? "Not phoned yet · " : ""}
               {wants ? `${wants} · ` : ""}
               last reply {formatSince(lead.last_reply_at)}
             </p>
@@ -419,7 +424,8 @@ function DetailRow({
         {tile === "visits" ? null : (
           <Score score={lead.intent_score} />
         )}
-        {tile === "waiting" && lead.callback_requested_at ? (
+        {(tile === "waiting" && lead.callback_requested_at) ||
+        (tile === "needs_call" && lead.needs_call) ? (
           <button
             type="button"
             disabled={marking}

@@ -29,7 +29,7 @@ import {
   type InboxThreadDetail,
   type ServiceWindow,
 } from "@/lib/inbox";
-import { formatSince, formatWhen, stageBadgeColor } from "@/lib/outreach";
+import { formatSince, formatWhen, stageBadgeColor, tierBadgeColor, tierLabel } from "@/lib/outreach";
 import { CalendarIcon, Dot, dotFor, MetaRule, SpanningLabel } from "@/components/messages/tokens";
 import { AiCallbackBadge, AiCallbackStrip } from "@/components/messages/AiCallbackStatus";
 import AiCallDetails from "@/components/ai-callback/AiCallDetails";
@@ -144,8 +144,8 @@ export default function ChatPanel({
             <Badge color={stageBadgeColor(thread.customer_stage)} size="sm">
               {thread.customer_stage}
             </Badge>
-            <Badge color="light" size="sm">
-              {thread.engagement_tier}
+            <Badge color={tierBadgeColor(thread.engagement_tier)} size="sm">
+              {tierLabel(thread.engagement_tier)}
             </Badge>
 
             <MetaRule />

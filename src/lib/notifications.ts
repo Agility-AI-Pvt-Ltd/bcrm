@@ -83,6 +83,18 @@ export async function markNotificationsViewed(payload: {
   });
 }
 
+/**
+ * The header bell polls every 30 s. When this tab changes what is read (the
+ * Notifications page, a click), it says so at once instead, so the bell and the
+ * list never disagree until the next poll.
+ */
+export const UNREAD_CHANGED = "notifications:unread-changed";
+
+export function announceUnread(count: number): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<number>(UNREAD_CHANGED, { detail: count }));
+}
+
 export function relativeTime(iso: string, now = Date.now()): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";

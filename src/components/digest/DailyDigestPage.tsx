@@ -69,10 +69,9 @@ export default function DailyDigestPage() {
           later warms up from cold to warm, or warm to hot, comes back there too.
         </p>
         <p className="mt-2 max-w-3xl text-xs text-gray-500 dark:text-gray-400">
-          This works even when the 9am digest does not. The morning message is a template,
-          so it needs Meta&rsquo;s approval and a billing currency set on your WhatsApp
-          account; asking for one yourself opens the 24-hour window, and the reply goes
-          back as an ordinary chat message with neither requirement. You can also type{" "}
+          This works even when the 9am digest does not: the morning message needs
+          WhatsApp&rsquo;s approval first, but a digest you ask for yourself comes back
+          straight away as a normal reply. You can also type{" "}
           <strong>leads</strong>, <strong>today</strong>, <strong>week</strong> or{" "}
           <strong>calls</strong> instead of tapping.
         </p>
