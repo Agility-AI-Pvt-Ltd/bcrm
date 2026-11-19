@@ -58,6 +58,9 @@ export const AGENT_PATHS = [
   "/daily-digest",
   "/calendar",
   "/notifications",
+  // Each agency submits its own templates from the library: approval is per
+  // WhatsApp Business account, so nobody else can do it for them.
+  "/whatsapp-templates",
   "/profile",
   // Flow voice (vc_v1) is listed so the API alone decides who may use it: it
   // answers "not open to agency users yet" until VC_V1_AGENTS_ALLOWED, and the

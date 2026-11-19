@@ -47,6 +47,13 @@ import LeadTileDetails from "@/components/campaigns/LeadTileDetails";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
 import {
+  LANGUAGE_LABEL,
+  leadFollowupLine,
+  resumeLeadFollowup,
+  setLeadFollowupLanguage,
+  stopLeadFollowup,
+} from "@/lib/followupSequence";
+import {
   BAND_HINTS,
   BAND_LABELS,
   INTEREST_BANDS,
@@ -275,6 +282,36 @@ export default function LeadsPage() {
       }
     },
     [reload, notLeadOnly, page?.total],
+  );
+
+  /** Stop, resume, or change the language of one lead's 5-touch follow-up. */
+  const changeFollowup = useCallback(
+    async (lead: Lead, action: "stop" | "resume" | { language: string | null }) => {
+      const who = lead.name || lead.phone || "This lead";
+      setMarkingId(lead.id);
+      try {
+        if (action === "stop") {
+          await stopLeadFollowup(lead.id);
+          setNotice(`No more automatic follow-ups to ${who}.`);
+        } else if (action === "resume") {
+          await resumeLeadFollowup(lead.id);
+          setNotice(`Follow-ups to ${who} are back on.`);
+        } else {
+          await setLeadFollowupLanguage(lead.id, action.language);
+          setNotice(
+            action.language
+              ? `${who}'s follow-ups will be in ${LANGUAGE_LABEL[action.language]}.`
+              : `${who}'s follow-ups will be in the language they write in.`,
+          );
+        }
+        reload();
+      } catch (error) {
+        setNotice(error instanceof ApiError ? error.message : "Could not save that.");
+      } finally {
+        setMarkingId("");
+      }
+    },
+    [reload],
   );
 
   const counts = snapshot?.counts ?? {};
@@ -921,6 +958,7 @@ export default function LeadsPage() {
                     marking={markingId === lead.id}
                     onMarkCalled={markCalled}
                     onNotLead={setNotLead}
+                    onFollowup={changeFollowup}
                     onOpen={setProfileOf}
                   />
                 ))
@@ -1014,6 +1052,7 @@ function LeadRow({
   marking,
   onMarkCalled,
   onNotLead,
+  onFollowup,
   onOpen,
 }: {
   lead: Lead;
@@ -1021,6 +1060,7 @@ function LeadRow({
   onMarkCalled: (lead: Lead) => void;
   /** Mark with a reason, or `null` to make them a lead again. */
   onNotLead: (lead: Lead, reason: string | null) => void;
+  onFollowup: (lead: Lead, action: "stop" | "resume" | { language: string | null }) => void;
   /** Open this customer's profile in the side drawer. */
   onOpen: (lead: Lead) => void;
 }) {
@@ -1086,6 +1126,7 @@ function LeadRow({
             Needs a call · replied {formatSince(lead.last_reply_at)}
           </p>
         ) : null}
+        <FollowupLine lead={lead} busy={marking} onFollowup={onFollowup} />
       </td>
       <td className="px-5 py-3">
         {lead.last_reply_text ? (
@@ -1224,5 +1265,68 @@ function LeadRow({
         )}
       </td>
     </tr>
+  );
+}
+
+
+/**
+ * Where this lead is in the 5-touch follow-up, under their number: "Follow-up 2
+ * of 5 · Thu 10:00", with Stop, and the language it goes in (tap to switch).
+ * Nothing at all for a lead who never entered it.
+ */
+function FollowupLine({
+  lead,
+  busy,
+  onFollowup,
+}: {
+  lead: Lead;
+  busy: boolean;
+  onFollowup: (lead: Lead, action: "stop" | "resume" | { language: string | null }) => void;
+}) {
+  const followup = lead.followup;
+  const line = leadFollowupLine(followup);
+  if (!followup || !line) return null;
+  const running = followup.status === "active" || followup.status === "sending";
+  const byTeam = followup.status === "stopped" && followup.stop_reason === "stopped_by_agent";
+  const language = followup.language_override ?? followup.language;
+  const nextLanguage = language === "hi" ? "en_US" : "hi";
+  return (
+    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+      <span title={followup.last_error ?? undefined}>
+        {line}
+        {running && followup.last_error ? " · waiting" : ""}
+      </span>
+      {running ? (
+        <>
+          <button
+            type="button"
+            disabled={busy}
+            title={`Send the follow-ups in ${LANGUAGE_LABEL[nextLanguage]} instead`}
+            onClick={() => onFollowup(lead, { language: nextLanguage })}
+            className="text-gray-500 underline decoration-dotted hover:text-brand-600 disabled:opacity-50"
+          >
+            {LANGUAGE_LABEL[language ?? ""] ?? "Auto language"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            title="No more automatic follow-ups to this lead"
+            onClick={() => onFollowup(lead, "stop")}
+            className="font-medium text-gray-500 hover:text-error-600 disabled:opacity-50"
+          >
+            Stop
+          </button>
+        </>
+      ) : byTeam ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onFollowup(lead, "resume")}
+          className="font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+        >
+          Resume
+        </button>
+      ) : null}
+    </p>
   );
 }

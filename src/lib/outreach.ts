@@ -11,6 +11,7 @@
  *    lead was reached, so cancelling only changes the campaign status.
  */
 
+import type { LeadFollowup } from "./followupSequence";
 import { apiFetch } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
@@ -243,6 +244,8 @@ export type Lead = {
   /** Marked "Not a lead" (a broker, vendor, wrong number). Only set in that list. */
   not_a_lead?: boolean;
   not_lead_reason?: string | null;
+  /** Where they are in the 5-touch follow-up; absent when they never entered it. */
+  followup?: LeadFollowup | null;
   preferred_location: string | null;
   bhk: string | null;
   budget_label: string | null;

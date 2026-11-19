@@ -35,6 +35,7 @@ export default function TemplatesPage() {
   const [summary, setSummary] = useState<TemplateSummary | null>(null);
   const [mine, setMine] = useState<OrganizationTemplate[]>([]);
   const [catalog, setCatalog] = useState<CatalogTemplate[]>([]);
+  const [language, setLanguage] = useState("all");
   const [version, setVersion] = useState(0);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -108,6 +109,26 @@ export default function TemplatesPage() {
     } finally {
       setBusy("");
     }
+  };
+
+  /** One set at a time: each submission is its own Graph call and review. */
+  const submitAll = async (entries: CatalogTemplate[]) => {
+    const key = libraryGroupKey(entries[0]);
+    setBusy(key);
+    setError("");
+    const failed: string[] = [];
+    for (const entry of entries) {
+      try {
+        await submitStarter(entry.id);
+      } catch (err) {
+        failed.push(`${entry.name} (${languageLabel(entry.language)}): ${failureText(err, "failed")}`);
+      }
+    }
+    setBusy("");
+    if (failed.length) setError(`Not submitted: ${failed.join("; ")}`);
+    const done = entries.length - failed.length;
+    if (done) setNotice(`${done} template${done === 1 ? "" : "s"} sent to Meta for review.`);
+    refresh();
   };
 
   const unused = catalog.filter((entry) => !entry.submission_status && entry.is_active);
@@ -274,44 +295,98 @@ export default function TemplatesPage() {
 
       {unused.length ? (
         <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            Ready-made templates you have not used
-          </h3>
-          <p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
-            Pre-written and already shaped the way Meta expects, with example values
-            filled in. Submitting sends it for review as it is — the wording cannot be
-            edited here, because a miscategorised template is a policy matter for your
-            account.
-          </p>
-          <ul className="mt-4 grid gap-3 lg:grid-cols-2">
-            {unused.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex flex-col rounded-xl border border-gray-200 p-3.5 dark:border-gray-800"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <code className="text-sm text-gray-800 dark:text-white/90">{entry.name}</code>
-                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">
-                    {entry.category}
-                  </span>
-                </div>
-                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  {entry.description}
-                </p>
-                <pre className="mt-2 max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg bg-gray-50 p-2.5 text-xs text-gray-700 dark:bg-white/[0.04] dark:text-gray-300">
-                  {entry.body}
-                </pre>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+                Template library
+              </h3>
+              <p className="mt-1 max-w-3xl text-sm text-gray-500 dark:text-gray-400">
+                Ready-made templates you have not submitted yet, already shaped the way Meta
+                expects, with example values filled in. Choose the ones you want and submit
+                them for review from your own WhatsApp account. The wording cannot be edited
+                here, because a miscategorised template is a policy matter for your account.
+              </p>
+            </div>
+            <div className="flex gap-1 rounded-lg bg-gray-100 p-1 text-xs dark:bg-white/[0.06]" role="group" aria-label="Language">
+              {[
+                ["all", "All languages"],
+                ["en_US", "English"],
+                ["hi", "Hindi"],
+              ].map(([value, label]) => (
                 <button
+                  key={value}
                   type="button"
-                  disabled={busy === entry.id}
-                  onClick={() => void submit(entry)}
-                  className="mt-3 h-9 self-start rounded-lg bg-brand-500 px-3 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                  aria-pressed={language === value}
+                  onClick={() => setLanguage(value)}
+                  className={`rounded-md px-2.5 py-1 font-medium ${language === value ? "bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-white" : "text-gray-500 dark:text-gray-400"}`}
                 >
-                  {busy === entry.id ? "Submitting…" : "Submit to Meta"}
+                  {label}
                 </button>
-              </li>
-            ))}
-          </ul>
+              ))}
+            </div>
+          </div>
+
+          {libraryGroups(unused, language).map((group) => (
+            <div key={group.key} className="mt-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-800 dark:text-white/90">{group.title}</h4>
+                  <p className="mt-0.5 max-w-3xl text-xs text-gray-500 dark:text-gray-400">{group.blurb}</p>
+                </div>
+                {group.entries.length > 1 ? (
+                  <button
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() => void submitAll(group.entries)}
+                    className="h-9 rounded-lg border border-brand-500 px-3 text-xs font-medium text-brand-600 hover:bg-brand-50 disabled:opacity-50 dark:text-brand-400 dark:hover:bg-brand-500/10"
+                  >
+                    {busy === group.key ? "Submitting…" : `Submit all ${group.entries.length}`}
+                  </button>
+                ) : null}
+              </div>
+              <ul className="mt-3 grid gap-3 lg:grid-cols-2">
+                {group.entries.map((entry) => (
+                  <li
+                    key={entry.id}
+                    className="flex flex-col rounded-xl border border-gray-200 p-3.5 dark:border-gray-800"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <code className="text-sm text-gray-800 dark:text-white/90">{entry.name}</code>
+                      <span className="flex gap-1.5">
+                        <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                          {languageLabel(entry.language)}
+                        </span>
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-white/[0.06] dark:text-gray-300">
+                          {entry.category}
+                        </span>
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      {entry.description}
+                    </p>
+                    <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg bg-gray-50 p-2.5 text-xs text-gray-700 dark:bg-white/[0.04] dark:text-gray-300">
+                      {entry.body}
+                    </pre>
+                    {Object.keys(entry.sample_values ?? {}).length ? (
+                      <p className="mt-1.5 text-[11px] text-gray-400">
+                        {Object.entries(entry.sample_values)
+                          .map(([number, sample]) => `{{${number}}} ${entry.variable_labels?.[number] ?? ""}: ${sample}`)
+                          .join(" · ")}
+                      </p>
+                    ) : null}
+                    <button
+                      type="button"
+                      disabled={Boolean(busy)}
+                      onClick={() => void submit(entry)}
+                      className="mt-3 h-9 self-start rounded-lg bg-brand-500 px-3 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50"
+                    >
+                      {busy === entry.id ? "Submitting…" : "Submit to Meta"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </section>
       ) : null}
 
@@ -325,4 +400,46 @@ export default function TemplatesPage() {
       />
     </div>
   );
+}
+
+const LANGUAGE_NAMES: Record<string, string> = { en_US: "English", en: "English", hi: "Hindi" };
+
+function languageLabel(code: string): string {
+  return LANGUAGE_NAMES[code] ?? code;
+}
+
+/** Which set of the library a starter belongs to, from its name. */
+function libraryGroupKey(entry: CatalogTemplate): string {
+  if (entry.name.startsWith("followup_touch_")) return "followup";
+  if (entry.name === "daily_digest" || entry.name === "ai_call_scheduled") return "team";
+  return "customers";
+}
+
+const LIBRARY_GROUPS: Array<{ key: string; title: string; blurb: string }> = [
+  {
+    key: "followup",
+    title: "5-touch follow-up",
+    blurb:
+      "Sent automatically on days 1, 3, 7, 10 and 14 to a lead who messaged and went quiet, in Hindi or English. Submit both languages so every customer gets their own; each one ends with “Reply STOP”.",
+  },
+  {
+    key: "customers",
+    title: "Messages to customers",
+    blurb: "Visit reminders, feedback, new matches and updates for people who enquired.",
+  },
+  {
+    key: "team",
+    title: "Messages to your team",
+    blurb: "Go to your agents' own WhatsApp numbers, not to customers.",
+  },
+];
+
+function libraryGroups(entries: CatalogTemplate[], language: string) {
+  const shown = entries.filter((entry) => language === "all" || entry.language === language);
+  return LIBRARY_GROUPS.map((group) => ({
+    ...group,
+    entries: shown
+      .filter((entry) => libraryGroupKey(entry) === group.key)
+      .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+  })).filter((group) => group.entries.length);
 }
