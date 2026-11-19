@@ -26,6 +26,7 @@ const CATEGORY_TONE: Record<string, string> = {
   official: "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200",
   system: "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400",
   repeated: "bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400",
+  not_a_lead: "bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400",
 };
 
 export default function FilteredMessagesPanel({

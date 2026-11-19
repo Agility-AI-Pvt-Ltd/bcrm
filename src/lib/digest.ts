@@ -67,7 +67,10 @@ export type DigestCounts = {
   new_leads: number;
   hot: number;
   warm: number;
+  /** Same four bands as Home (P1-1), plus leads the AI has not scored yet. */
+  cool: number;
   cold: number;
+  unscored: number;
   followups_due: number;
   not_contacted: number;
   visits_today: number;

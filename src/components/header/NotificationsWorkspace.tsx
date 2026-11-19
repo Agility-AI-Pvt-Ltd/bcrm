@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import FailedJobsCard from "@/components/header/FailedJobsCard";
 import FailedRepliesCard from "@/components/header/FailedRepliesCard";
 import NotificationItem from "@/components/header/NotificationItem";
 import { failureText } from "@/lib/api";
@@ -80,6 +81,7 @@ export default function NotificationsWorkspace() {
     <div>
       <PageBreadcrumb pageTitle="Notifications" />
       <FailedRepliesCard />
+      <FailedJobsCard />
       <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>

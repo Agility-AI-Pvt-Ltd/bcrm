@@ -12,7 +12,7 @@ export type FilteredMessage = {
   id: string;
   sender_phone: string;
   sender_name: string | null;
-  category: "automated" | "promotional" | "official" | "system" | "repeated" | string;
+  category: "automated" | "promotional" | "official" | "system" | "repeated" | "not_a_lead" | string;
   category_label: string;
   /** The signals that decided it, in words. */
   reason: string;

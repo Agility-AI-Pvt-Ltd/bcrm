@@ -18,7 +18,7 @@
 import Badge from "@/components/ui/badge/Badge";
 import {
   bandBadgeColor,
-  interestBand,
+  knownBand,
   waitingLabel,
   type InboxThread,
 } from "@/lib/inbox";
@@ -108,7 +108,7 @@ function ThreadRow({
   onOpen: () => void;
   onToggleSelect: () => void;
 }) {
-  const band = thread.interest_band || interestBand(thread.interest_score);
+  const band = knownBand(thread.interest_band);
   const waiting = thread.awaiting_reply ? waitingLabel(thread.waiting_since) : "";
 
   return (
