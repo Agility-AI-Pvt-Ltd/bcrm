@@ -22,7 +22,9 @@ type CountKey =
   | "new_leads"
   | "hot"
   | "warm"
+  | "cool"
   | "cold"
+  | "unscored"
   | "followups_due"
   | "not_contacted"
   | "visits_today"
@@ -32,7 +34,9 @@ const LINES: Array<{ key: CountKey; label: string }> = [
   { key: "new_leads", label: "New leads" },
   { key: "hot", label: "🔥 Hot" },
   { key: "warm", label: "🟡 Warm" },
+  { key: "cool", label: "🔵 Cool" },
   { key: "cold", label: "⚪ Cold" },
+  { key: "unscored", label: "▫️ Not scored yet" },
   { key: "followups_due", label: "Follow-ups due" },
   { key: "not_contacted", label: "Not contacted yet" },
   { key: "visits_today", label: "Site visits today" },

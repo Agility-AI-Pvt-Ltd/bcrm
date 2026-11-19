@@ -28,7 +28,7 @@ import { useCallback, useEffect, useState } from "react";
 import CustomerProfileDrawer from "@/components/campaigns/CustomerProfileDrawer";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
-import { bandBadgeColor, interestBand, interestLabel } from "@/lib/inbox";
+import { bandBadgeColor, interestLabel, knownBand } from "@/lib/inbox";
 import {
   formatSince,
   formatWhen,
@@ -38,13 +38,14 @@ import {
 } from "@/lib/outreach";
 import { getVisits, getVisitsForContacts, type ContactVisit, type Visit } from "@/lib/siteVisits";
 
-export type TileKey = "waiting" | "leads" | "conversation" | "visits";
+export type TileKey = "waiting" | "needs_call" | "leads" | "conversation" | "visits";
 
 /** Enough to scan at a glance; the rest are one click away in the table. */
 const PANEL_LIMIT = 25;
 
 const TITLES: Record<TileKey, string> = {
   waiting: "Waiting for a call",
+  needs_call: "Needs a call",
   leads: "Leads",
   conversation: "In conversation",
   visits: "Visits scheduled",
@@ -52,9 +53,10 @@ const TITLES: Record<TileKey, string> = {
 
 const EMPTY: Record<TileKey, string> = {
   waiting: "Nobody is waiting to be phoned.",
+  needs_call: "Everyone who replied has been phoned.",
   leads: "Nobody has replied in this period yet.",
   conversation: "Nobody has written back more than once in this period.",
-  visits: "No visits are scheduled in this period.",
+  visits: "No visits coming up.",
 };
 
 const TONE_BADGE = {
@@ -137,22 +139,25 @@ function filterFor(key: TileKey) {
   switch (key) {
     case "waiting":
       return { awaitingCallback: true };
+    case "needs_call":
+      return { needsCall: true };
     case "conversation":
       return { multiReply: true };
     case "visits":
-      return { stage: "Visit Scheduled" };
+      // Visits still to come, not a stage that stays after the visit is over.
+      return { upcomingVisit: true };
     default:
       return { replied: true };
   }
 }
 
-function Score({ score }: { score: number | null }) {
-  const band = interestBand(score);
+function Score({ score, band: rawBand }: { score: number | null; band?: string | null }) {
+  const band = knownBand(rawBand);
   if (score === null || band === null) {
     return <span className="text-gray-400">—</span>;
   }
   return (
-    <span title={interestLabel(score)}>
+    <span title={interestLabel(score, band)}>
       <Badge color={bandBadgeColor(band)} size="sm">
         {score}
       </Badge>
@@ -222,7 +227,9 @@ export default function LeadTileDetails({
   }, [onClose, profileOf]);
 
   const scopeNote =
-    tile === "waiting"
+    tile === "visits"
+      ? "Every period — any visit still to come is shown whatever window is selected."
+      : tile === "waiting" || tile === "needs_call"
       ? "Every period — a call still owed is shown whatever window is selected."
       : period === "all"
         ? "All time"
@@ -408,6 +415,7 @@ function DetailRow({
                 ? `Asked for a call ${formatSince(lead.callback_requested_at)} · `
                 : ""}
               {tile === "conversation" ? `${lead.reply_count} replies · ` : ""}
+              {tile === "needs_call" ? "Not phoned yet · " : ""}
               {wants ? `${wants} · ` : ""}
               last reply {formatSince(lead.last_reply_at)}
             </p>
@@ -417,9 +425,10 @@ function DetailRow({
 
       <div className="flex items-center gap-2 sm:justify-end">
         {tile === "visits" ? null : (
-          <Score score={lead.intent_score} />
+          <Score score={lead.intent_score} band={lead.interest_band} />
         )}
-        {tile === "waiting" && lead.callback_requested_at ? (
+        {(tile === "waiting" && lead.callback_requested_at) ||
+        (tile === "needs_call" && lead.needs_call) ? (
           <button
             type="button"
             disabled={marking}

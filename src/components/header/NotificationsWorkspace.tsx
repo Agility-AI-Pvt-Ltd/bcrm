@@ -3,9 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import FailedJobsCard from "@/components/header/FailedJobsCard";
+import FailedRepliesCard from "@/components/header/FailedRepliesCard";
 import NotificationItem from "@/components/header/NotificationItem";
 import { failureText } from "@/lib/api";
 import {
+  announceUnread,
   clickNotification,
   listNotifications,
   markNotificationsViewed,
@@ -35,15 +38,11 @@ export default function NotificationsWorkspace() {
       setItems(page.items);
       setTotal(page.total);
       setUnread(page.unread_count);
+      announceUnread(page.unread_count);
       setError("");
-      const unseen = page.items.filter((item) => !item.viewed).map((item) => item.id);
-      if (unseen.length > 0) {
-        const result = await markNotificationsViewed({ ids: unseen });
-        setUnread(result.unread_count);
-        setItems((current) =>
-          current.map((item) => (unseen.includes(item.id) ? { ...item, viewed: true } : item)),
-        );
-      }
+      // Opening the page no longer marks everything read: that emptied "Unread
+      // only" the moment it loaded and left the bell out of step. Items are
+      // read when opened, or with "Mark all as read".
     } catch (err) {
       setError(failureText(err, "Could not load notifications."));
     } finally {
@@ -58,6 +57,7 @@ export default function NotificationsWorkspace() {
   const openItem = async (item: OrgNotification) => {
     try {
       await clickNotification(item.id);
+      if (!item.viewed) announceUnread(Math.max(0, unread - 1));
     } catch {
       // Still take them to the work.
     }
@@ -68,6 +68,7 @@ export default function NotificationsWorkspace() {
     try {
       const result = await markNotificationsViewed({ all: true });
       setUnread(result.unread_count);
+      announceUnread(result.unread_count);
       setItems((current) => current.map((item) => ({ ...item, viewed: true })));
     } catch (err) {
       setError(failureText(err, "Could not mark notifications as read."));
@@ -79,6 +80,8 @@ export default function NotificationsWorkspace() {
   return (
     <div>
       <PageBreadcrumb pageTitle="Notifications" />
+      <FailedRepliesCard />
+      <FailedJobsCard />
       <section className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -86,9 +89,11 @@ export default function NotificationsWorkspace() {
               All notifications
             </h3>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {unread > 0
-                ? `${unread} unread. Opening this page marks what you can see as viewed.`
-                : "You're caught up."}
+              {loading && items.length === 0
+                ? "\u00a0"
+                : unread > 0
+                  ? `${unread} unread. Open one to mark it read.`
+                  : "You're caught up."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

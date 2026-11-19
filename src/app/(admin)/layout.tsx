@@ -3,6 +3,7 @@
 import { useSidebar } from "@/context/SidebarContext";
 import AgentRouteGuard from "@/components/auth/AgentRouteGuard";
 import AuthGate from "@/components/auth/AuthGate";
+import ConnectionProblemsBar from "@/components/auth/ConnectionProblemsBar";
 import DeveloperSessionBanner from "@/components/auth/DeveloperSessionBanner";
 import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
@@ -38,6 +39,7 @@ export default function AdminLayout({
           className={`min-w-0 flex-1 transition-all duration-300 ease-in-out ${mainContentMargin}`}
         >
           <DeveloperSessionBanner />
+          <ConnectionProblemsBar />
           <AppHeader />
           <div className="mx-auto max-w-(--breakpoint-2xl) p-4 md:p-6">
             <AgentRouteGuard>{children}</AgentRouteGuard>

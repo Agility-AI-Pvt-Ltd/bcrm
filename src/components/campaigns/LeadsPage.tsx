@@ -47,8 +47,18 @@ import LeadTileDetails from "@/components/campaigns/LeadTileDetails";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
 import {
+  LANGUAGE_LABEL,
+  leadFollowupLine,
+  resumeLeadFollowup,
+  setLeadFollowupLanguage,
+  stopLeadFollowup,
+} from "@/lib/followupSequence";
+import {
+  BAND_HINTS,
+  BAND_LABELS,
+  INTEREST_BANDS,
   bandBadgeColor,
-  interestBand,
+  knownBand,
   interestLabel,
 } from "@/lib/inbox";
 import {
@@ -60,8 +70,12 @@ import {
   getPipeline,
   listLeads,
   markCallbackCalled,
+  markNotLead,
+  NOT_LEAD_REASONS,
+  unmarkNotLead,
   stageBadgeColor,
   tierBadgeColor,
+  tierLabel,
   type Lead,
   type LeadPage as LeadPageData,
   type LeadPeriod,
@@ -78,20 +92,23 @@ type LeadScope = "replied" | "all";
 
 /** The four headline tiles that open a list of the people they count.
  *  Reply rate is a ratio, not a list, so it stays a plain card. */
-type HeadlineKey = "waiting" | "leads" | "conversation" | "visits";
+type HeadlineKey = "waiting" | "needs_call" | "leads" | "conversation" | "visits";
 
 // The same tier means something different depending on the scope: among people
 // who wrote back, `low` is close to an opt-out; across everyone, `low` is simply
 // everyone still silent. Showing one wording in both places made the board lie.
 const TIER_HINTS: Record<LeadScope, Record<string, string>> = {
+  // "high" is engagement, not the interest score: 3+ replies, 2 replies with
+  // some interest, a score of 60+, or a visit/negotiation. A low score with
+  // many replies is still high here; the score column shows interest.
   replied: {
-    high: "Replied more than once, or already deep in the funnel — call first",
-    medium: "Replied once — keep the conversation warm",
+    high: "Talking a lot, keen, or at a visit — call first",
+    medium: "Replied, but no strong sign yet — keep it warm",
     low: "Graded low despite replying — usually an opt-out",
   },
   all: {
-    high: "Replied more than once — call these first",
-    medium: "Replied once — keep the conversation going",
+    high: "Talking a lot, keen, or at a visit — call first",
+    medium: "Replied, but no strong sign yet — keep it going",
     low: "No reply yet — the AI keeps following up",
   },
 };
@@ -113,6 +130,13 @@ export default function LeadsPage() {
   const [stage, setStage] = useState("");
   const [tier, setTier] = useState("");
   const [awaitingOnly, setAwaitingOnly] = useState(false);
+  const [needsCallOnly, setNeedsCallOnly] = useState(false);
+  const [band, setBand] = useState("");
+  const [upcomingOnly, setUpcomingOnly] = useState(false);
+  /** The list of people marked "Not a lead", for checking and undoing. */
+  const [notLeadOnly, setNotLeadOnly] = useState(false);
+  /** The last one marked, so the toast can offer Undo. */
+  const [undoable, setUndoable] = useState<Lead | null>(null);
   const [multiReply, setMultiReply] = useState(false);
   /** Which tile's list is open under the tiles, if any. */
   const [openTile, setOpenTile] = useState<HeadlineKey | null>(null);
@@ -130,7 +154,10 @@ export default function LeadsPage() {
 
   useEffect(() => {
     if (!notice) return;
-    const timer = setTimeout(() => setNotice(""), 6000);
+    const timer = setTimeout(() => {
+      setNotice("");
+      setUndoable(null);
+    }, 6000);
     return () => clearTimeout(timer);
   }, [notice]);
 
@@ -163,6 +190,10 @@ export default function LeadsPage() {
           stage: stage || undefined,
           tier: tier || undefined,
           awaitingCallback: awaitingOnly || undefined,
+          needsCall: needsCallOnly || undefined,
+          band: band || undefined,
+          upcomingVisit: upcomingOnly || undefined,
+          notLead: notLeadOnly || undefined,
           multiReply: multiReply || undefined,
           search: search || undefined,
           period,
@@ -175,7 +206,7 @@ export default function LeadsPage() {
     } finally {
       setLoading(false);
     }
-  }, [scope, stage, tier, awaitingOnly, multiReply, search, period, offset]);
+  }, [scope, stage, tier, awaitingOnly, needsCallOnly, band, upcomingOnly, notLeadOnly, multiReply, search, period, offset]);
 
   useEffect(() => {
     void loadSnapshot();
@@ -222,9 +253,71 @@ export default function LeadsPage() {
     [reload],
   );
 
+  /**
+   * "Not a lead": a broker, vendor or wrong number who replied. Out of every
+   * count and list at once; the toast offers Undo for six seconds, and the
+   * "Not leads" list keeps it undoable after that.
+   */
+  const setNotLead = useCallback(
+    async (lead: Lead, reason: string | null) => {
+      const who = lead.name || lead.phone || "This contact";
+      setMarkingId(lead.id);
+      try {
+        if (reason === null) {
+          await unmarkNotLead(lead.id);
+          setUndoable(null);
+          // The last one restored: nothing left in that list, so back to the leads.
+          if (notLeadOnly && (page?.total ?? 0) <= 1) setNotLeadOnly(false);
+          setNotice(`${who} is counted as a lead again.`);
+        } else {
+          await markNotLead(lead.id, reason);
+          setUndoable(lead);
+          setNotice(`${who} is no longer counted as a lead (${reason.toLowerCase()}).`);
+        }
+        reload();
+      } catch (error) {
+        setNotice(error instanceof ApiError ? error.message : "Could not save that.");
+      } finally {
+        setMarkingId("");
+      }
+    },
+    [reload, notLeadOnly, page?.total],
+  );
+
+  /** Stop, resume, or change the language of one lead's 5-touch follow-up. */
+  const changeFollowup = useCallback(
+    async (lead: Lead, action: "stop" | "resume" | { language: string | null }) => {
+      const who = lead.name || lead.phone || "This lead";
+      setMarkingId(lead.id);
+      try {
+        if (action === "stop") {
+          await stopLeadFollowup(lead.id);
+          setNotice(`No more automatic follow-ups to ${who}.`);
+        } else if (action === "resume") {
+          await resumeLeadFollowup(lead.id);
+          setNotice(`Follow-ups to ${who} are back on.`);
+        } else {
+          await setLeadFollowupLanguage(lead.id, action.language);
+          setNotice(
+            action.language
+              ? `${who}'s follow-ups will be in ${LANGUAGE_LABEL[action.language]}.`
+              : `${who}'s follow-ups will be in the language they write in.`,
+          );
+        }
+        reload();
+      } catch (error) {
+        setNotice(error instanceof ApiError ? error.message : "Could not save that.");
+      } finally {
+        setMarkingId("");
+      }
+    },
+    [reload],
+  );
+
   const counts = snapshot?.counts ?? {};
   const tiers = snapshot?.tiers?.length ? snapshot.tiers : [...ENGAGEMENT_TIERS];
   const waiting = counts.callback_waiting ?? 0;
+  const needsCall = counts.needs_call ?? 0;
 
   // Someone who replies is advanced to at least `Replied`, so in the replied
   // scope the earlier stages would only ever render an empty filter. Across
@@ -270,8 +363,11 @@ export default function LeadsPage() {
   const stats = useMemo(() => {
     const values = snapshot?.counts ?? {};
     const leads = values.replied ?? 0;
-    const everyone = values.total ?? 0;
-    const rate = everyone ? Math.round((leads / everyone) * 100) : 0;
+    // A cohort: of the people first messaged in this period, how many replied
+    // (P1-4). People who wrote to us first are not outreach and are left out.
+    const sent = values.outreach_sent ?? 0;
+    const answered = values.outreach_replied ?? 0;
+    const rate = sent ? Math.round((answered / sent) * 100) : null;
     return [
       {
         key: "leads" as const,
@@ -289,16 +385,21 @@ export default function LeadsPage() {
       },
       {
         key: "visits" as const,
-        value: String(values["Visit Scheduled"] ?? 0),
+        // Leads with a visit still to come. The stage count it replaced kept
+        // past and missed visits, because a stage never moves back.
+        value: String(values.visits_upcoming ?? values["Visit Scheduled"] ?? 0),
         label: "Visits scheduled",
-        hint: "Agreed to see a property",
+        hint: "A visit still to come — every period",
         activeHint: "Listed below — click to close",
       },
       {
         key: null,
-        value: `${rate}%`,
+        value: rate === null ? "—" : `${rate}%`,
         label: "Reply rate",
-        hint: `${leads} of ${everyone} contact(s) answered`,
+        hint:
+          rate === null
+            ? "Nobody was first messaged in this period"
+            : `${answered} of ${sent} people messaged in this period replied`,
         activeHint: "",
       },
     ];
@@ -338,9 +439,13 @@ export default function LeadsPage() {
     setTier("");
     setSearchInput("");
     setAwaitingOnly(key === "waiting");
+    setNeedsCallOnly(key === "needs_call");
+    setBand("");
     setMultiReply(key === "conversation");
-    setStage(key === "visits" ? "Visit Scheduled" : "");
+    setStage("");
+    setUpcomingOnly(key === "visits");
     setScope(key === "waiting" || key === "visits" ? "all" : "replied");
+    // "Needs a call" counts repliers only, so the replied scope already matches.
     setOpenTile(null);
     requestAnimationFrame(() =>
       tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
@@ -349,16 +454,29 @@ export default function LeadsPage() {
 
   const headlineActive: Record<HeadlineKey, boolean> = {
     waiting: openTile === "waiting",
+    needs_call: openTile === "needs_call",
     conversation: openTile === "conversation",
     visits: openTile === "visits",
     leads: openTile === "leads",
   };
 
-  const filtered = Boolean(stage || tier || search || awaitingOnly || multiReply);
+  const filtered = Boolean(
+    stage ||
+      tier ||
+      search ||
+      awaitingOnly ||
+      needsCallOnly ||
+      band ||
+      upcomingOnly ||
+      notLeadOnly ||
+      multiReply,
+  );
+  const notLeadCount = counts.not_lead ?? 0;
 
   return (
     <div>
-      <PageBreadcrumb pageTitle="Leads" />
+      {/* "Home" as in the menu: one name for one page. The list on it is leads. */}
+      <PageBreadcrumb pageTitle="Home" />
 
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -442,7 +560,10 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* Call now: the people owed a phone call, at the top because the next
+          action is a call, not reading analytics. The counts follow below. */}
+      <h2 className="mb-2 text-sm font-semibold text-gray-800 dark:text-white/90">Call now</h2>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {/* First card: everyone here was promised a phone call by the assistant,
             so this is the one number on the page that represents work already
             owed to a customer. The other three counts are the same kind of
@@ -477,6 +598,34 @@ export default function LeadsPage() {
                 : "Nobody is waiting to be phoned"}
           </p>
         </button>
+        {/* Everyone who replied and has not been phoned — the lead that goes
+            cold while "Waiting for a call" (callback requests only) reads 0. */}
+        <button
+          type="button"
+          onClick={() => toggleTile("needs_call")}
+          aria-expanded={headlineActive.needs_call}
+          aria-controls="lead-tile-details"
+          className={`rounded-2xl border p-5 text-left transition ${
+            headlineActive.needs_call
+              ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
+              : needsCall > 0
+                ? "border-error-300 bg-error-50 hover:border-error-400 dark:border-error-500/40 dark:bg-error-500/10"
+                : "border-gray-200 bg-white hover:border-brand-300 dark:border-gray-800 dark:bg-white/[0.03]"
+          }`}
+        >
+          <p className="text-2xl font-semibold text-gray-800 dark:text-white/90">{needsCall}</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Needs a call</p>
+          <p className="mt-1 text-[11px] leading-snug text-gray-400">
+            {headlineActive.needs_call
+              ? "Listed below — click to close"
+              : needsCall > 0
+                ? "Replied, never phoned — longest wait first, every period"
+                : "Everyone who replied has been phoned"}
+          </p>
+        </button>
+      </div>
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((card) => {
           const active = card.key ? headlineActive[card.key] : false;
           const className = `rounded-2xl border p-5 text-left transition ${
@@ -536,7 +685,60 @@ export default function LeadsPage() {
         />
       ) : null}
 
-      {/* Warmth first: it is the column that decides who gets called today. */}
+      {/* Interest, counted by the same function as Messages' "Hot" over every
+          lead who replied, so the two screens show the same number. Whatever
+          the period: a score is where a lead stands now. */}
+      <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+        Interest — how keen they are to rent or buy. All leads, every period; the same Hot count
+        as Messages.
+        {(counts.interest_unscored ?? 0) > 0
+          ? ` ${counts.interest_unscored} not scored yet.`
+          : ""}
+      </p>
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {INTEREST_BANDS.map((name) => {
+          const active = band === name;
+          return (
+            <button
+              key={name}
+              type="button"
+              onClick={() => {
+                setBand(active ? "" : name);
+                setOffset(0);
+                if (!active) {
+                  setScope("replied");
+                  requestAnimationFrame(() =>
+                    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                  );
+                }
+              }}
+              className={`rounded-2xl border p-4 text-left transition ${
+                active
+                  ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
+                  : "border-gray-200 bg-white hover:border-brand-300 dark:border-gray-800 dark:bg-white/[0.03]"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Badge color={bandBadgeColor(name)} size="sm">
+                  {BAND_LABELS[name]}
+                </Badge>
+                <span className="text-lg font-semibold text-gray-800 dark:text-white/90">
+                  {counts[`interest_${name}`] ?? 0}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[11px] leading-snug text-gray-500">{BAND_HINTS[name]}</p>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Engagement, not interest: how much they reply. Said in a line, because
+          "Very active" beside a Cold score is correct and should not look like
+          a contradiction. */}
+      <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+        Engagement — how much they reply. Separate from the interest score (Hot / Warm / Cold)
+        in the table: a chatty lead can still be cold on buying.
+      </p>
       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {tiers.map((name) => {
           const active = tier === name;
@@ -544,7 +746,18 @@ export default function LeadsPage() {
             <button
               key={name}
               type="button"
-              onClick={() => setFilter(stage, active ? "" : name)}
+              onClick={() => {
+                setFilter(stage, active ? "" : name);
+                // The count covers everyone, so show everyone, and bring the
+                // list into view: the table is below the fold, so the click
+                // otherwise looked like it did nothing.
+                if (!active) {
+                  setScope("all");
+                  requestAnimationFrame(() =>
+                    tableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+                  );
+                }
+              }}
               className={`rounded-2xl border p-4 text-left transition ${
                 active
                   ? "border-brand-500 bg-brand-50 dark:bg-brand-500/10"
@@ -553,7 +766,7 @@ export default function LeadsPage() {
             >
               <div className="flex items-center gap-2">
                 <Badge color={tierBadgeColor(name)} size="sm">
-                  {name}
+                  {tierLabel(name)}
                 </Badge>
                 <span className="text-lg font-semibold text-gray-800 dark:text-white/90">
                   {counts[name] ?? 0}
@@ -583,12 +796,32 @@ export default function LeadsPage() {
             ) : null}
             {tier ? (
               <Badge color={tierBadgeColor(tier)} size="sm">
-                {tier}
+                {tierLabel(tier)}
               </Badge>
             ) : null}
             {awaitingOnly ? (
               <Badge color="warning" size="sm">
                 Waiting for a call
+              </Badge>
+            ) : null}
+            {needsCallOnly ? (
+              <Badge color="error" size="sm">
+                Needs a call
+              </Badge>
+            ) : null}
+            {upcomingOnly ? (
+              <Badge color="info" size="sm">
+                Visit coming up
+              </Badge>
+            ) : null}
+            {notLeadOnly ? (
+              <Badge color="light" size="sm">
+                Not leads
+              </Badge>
+            ) : null}
+            {band ? (
+              <Badge color={bandBadgeColor(band)} size="sm">
+                {BAND_LABELS[band]} interest
               </Badge>
             ) : null}
             {multiReply ? (
@@ -602,6 +835,10 @@ export default function LeadsPage() {
                 onClick={() => {
                   setFilter("", "");
                   setAwaitingOnly(false);
+                  setNeedsCallOnly(false);
+                  setBand("");
+                  setUpcomingOnly(false);
+                  setNotLeadOnly(false);
                   setMultiReply(false);
                   setSearchInput("");
                 }}
@@ -611,15 +848,32 @@ export default function LeadsPage() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
             <input
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder="Search name, phone or what they said"
-              className="w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-transparent dark:text-gray-300"
+              className="w-full sm:w-64 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-transparent dark:text-gray-300"
             />
             <span className="text-xs text-gray-500">{page?.total ?? 0} matching</span>
+            {notLeadCount > 0 || notLeadOnly ? (
+              // Out of every count, but never out of reach: this is where a
+              // marking is checked and undone.
+              <button
+                type="button"
+                onClick={() => {
+                  setNotLeadOnly((value) => !value);
+                  setOffset(0);
+                }}
+                title="People marked Not a lead — brokers, vendors, wrong numbers. Left out of every count."
+                className={`text-xs font-medium ${
+                  notLeadOnly ? "text-brand-600" : "text-gray-500 hover:text-brand-600"
+                }`}
+              >
+                {notLeadOnly ? "Back to leads" : `Not leads (${notLeadCount})`}
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -691,6 +945,8 @@ export default function LeadsPage() {
                   <td colSpan={10} className="px-5 py-10 text-center text-gray-500">
                     {awaitingOnly
                       ? "Nobody is waiting for a call right now."
+                      : needsCallOnly
+                        ? "Everyone who replied has been phoned."
                       : multiReply
                         ? "Nobody has written back more than once."
                         : filtered
@@ -705,6 +961,8 @@ export default function LeadsPage() {
                     lead={lead}
                     marking={markingId === lead.id}
                     onMarkCalled={markCalled}
+                    onNotLead={setNotLead}
+                    onFollowup={changeFollowup}
                     onOpen={setProfileOf}
                   />
                 ))
@@ -749,8 +1007,17 @@ export default function LeadsPage() {
       ) : null}
 
       {notice && (
-        <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-theme-lg dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
-          {notice}
+        <div className="fixed bottom-5 right-5 z-50 flex max-w-sm items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-theme-lg dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200">
+          <span className="flex-1">{notice}</span>
+          {undoable ? (
+            <button
+              type="button"
+              onClick={() => void setNotLead(undoable, null)}
+              className="font-medium text-brand-600 hover:text-brand-700"
+            >
+              Undo
+            </button>
+          ) : null}
         </div>
       )}
     </div>
@@ -765,8 +1032,8 @@ function whatsappHref(phone: string | null) {
 }
 
 /** The LLM's 0–100 interest read. Null means never scored, not zero. */
-function LeadScore({ score }: { score: number | null }) {
-  const band = interestBand(score);
+function LeadScore({ score, band: rawBand }: { score: number | null; band?: string | null }) {
+  const band = knownBand(rawBand);
   if (score === null || band === null) {
     return (
       <span className="text-gray-400" title="Not scored yet">
@@ -775,9 +1042,10 @@ function LeadScore({ score }: { score: number | null }) {
     );
   }
   return (
-    <span title={interestLabel(score)}>
+    <span title={interestLabel(score, band)}>
       <Badge color={bandBadgeColor(band)} size="sm">
-        {score}
+        {/* The word first: it is what an agent acts on; the number is detail. */}
+        {BAND_LABELS[band]} · {score}
       </Badge>
     </span>
   );
@@ -787,11 +1055,16 @@ function LeadRow({
   lead,
   marking,
   onMarkCalled,
+  onNotLead,
+  onFollowup,
   onOpen,
 }: {
   lead: Lead;
   marking: boolean;
   onMarkCalled: (lead: Lead) => void;
+  /** Mark with a reason, or `null` to make them a lead again. */
+  onNotLead: (lead: Lead, reason: string | null) => void;
+  onFollowup: (lead: Lead, action: "stop" | "resume" | { language: string | null }) => void;
   /** Open this customer's profile in the side drawer. */
   onOpen: (lead: Lead) => void;
 }) {
@@ -800,6 +1073,10 @@ function LeadRow({
     .join(" · ");
   const chat = whatsappHref(lead.phone);
   const waitingSince = lead.callback_requested_at;
+  // Replied and never phoned: said in red with how long they have waited, so
+  // the age is read in the same glance as the name (the checklist's P0-1).
+  const uncalled = !waitingSince && lead.needs_call;
+  const [choosing, setChoosing] = useState(false);
 
   return (
     <tr className={waitingSince ? "bg-amber-50/50 dark:bg-amber-500/[0.04]" : undefined}>
@@ -813,14 +1090,25 @@ function LeadRow({
           {lead.name || "Unnamed"}
         </button>
         {chat ? (
-          <a
-            href={chat}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-brand-500 hover:text-brand-600"
-          >
-            {lead.phone}
-          </a>
+          <span className="flex items-center gap-2 text-xs">
+            <a
+              href={chat}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-brand-500 hover:text-brand-600"
+              title="Open in WhatsApp"
+            >
+              {lead.phone}
+            </a>
+            {/* One tap to call from a phone; on a laptop it hands off to a dialler. */}
+            <a
+              href={`tel:${String(lead.phone).replace(/[^\d+]/g, "")}`}
+              className="rounded-full border border-brand-200 px-2 py-0.5 font-medium text-brand-600 hover:bg-brand-50 dark:border-brand-500/30 dark:text-brand-400"
+              aria-label={`Call ${lead.name || lead.phone}`}
+            >
+              Call
+            </a>
+          </span>
         ) : (
           <p className="text-xs text-gray-500">{lead.phone || lead.email || "—"}</p>
         )}
@@ -834,7 +1122,15 @@ function LeadRow({
           >
             Waiting for a call · {formatSince(waitingSince)}
           </p>
+        ) : uncalled ? (
+          <p
+            className="mt-1.5 inline-flex rounded-full bg-error-100 px-2 py-0.5 text-[11px] font-medium text-error-700 dark:bg-error-500/15 dark:text-error-300"
+            title={`Replied ${formatWhen(lead.last_reply_at)} and nobody has phoned them`}
+          >
+            Needs a call · replied {formatSince(lead.last_reply_at)}
+          </p>
         ) : null}
+        <FollowupLine lead={lead} busy={marking} onFollowup={onFollowup} />
       </td>
       <td className="px-5 py-3">
         {lead.last_reply_text ? (
@@ -857,14 +1153,22 @@ function LeadRow({
         <Badge color={stageBadgeColor(lead.customer_stage)} size="sm">
           {lead.customer_stage}
         </Badge>
+        {lead.visit_missed ? (
+          // The stage cannot step back, so the missed visit is said beside it.
+          <span className="mt-1 block">
+            <Badge color="warning" size="sm">
+              Visit missed
+            </Badge>
+          </span>
+        ) : null}
       </td>
       <td className="px-5 py-3">
-        <LeadScore score={lead.intent_score} />
+        <LeadScore score={lead.intent_score} band={lead.interest_band} />
       </td>
       <td className="hidden px-5 py-3 min-[1320px]:table-cell">
         <div className="flex items-center gap-2">
           <Badge color={tierBadgeColor(lead.engagement_tier)} size="sm">
-            {lead.engagement_tier}
+            {tierLabel(lead.engagement_tier)}
           </Badge>
           {lead.outreach_paused ? (
             <span
@@ -901,20 +1205,132 @@ function LeadRow({
         {formatSince(lead.last_reply_at)}
       </td>
       <td className="px-5 py-3">
-        {waitingSince ? (
-          <button
-            type="button"
-            disabled={marking}
-            onClick={() => onMarkCalled(lead)}
-            title="Record that you phoned them and take them off the call list"
-            className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
-          >
-            {marking ? "Saving…" : "Mark called"}
-          </button>
+        {lead.not_a_lead ? (
+          <div className="flex flex-col items-start gap-1">
+            <Badge color="light" size="sm">
+              {lead.not_lead_reason || "Not a lead"}
+            </Badge>
+            <button
+              type="button"
+              disabled={marking}
+              onClick={() => onNotLead(lead, null)}
+              className="text-xs font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+            >
+              {marking ? "Saving…" : "It is a lead"}
+            </button>
+          </div>
+        ) : choosing ? (
+          <div className="flex flex-col items-start gap-1" role="group" aria-label="Why not a lead">
+            {NOT_LEAD_REASONS.map((reason) => (
+              <button
+                key={reason}
+                type="button"
+                disabled={marking}
+                onClick={() => {
+                  setChoosing(false);
+                  onNotLead(lead, reason);
+                }}
+                className="text-left text-xs text-gray-700 hover:text-brand-600 disabled:opacity-50 dark:text-gray-300"
+              >
+                {reason}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setChoosing(false)}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >
+              Cancel
+            </button>
+          </div>
         ) : (
-          <span className="text-gray-300 dark:text-gray-600">—</span>
+          <div className="flex flex-col items-start gap-1.5">
+            {waitingSince || uncalled ? (
+              <button
+                type="button"
+                disabled={marking}
+                onClick={() => onMarkCalled(lead)}
+                title="Record that you phoned them and take them off the call list"
+                className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
+              >
+                {marking ? "Saving…" : "Mark called"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              disabled={marking}
+              onClick={() => setChoosing(true)}
+              title="A broker, vendor or wrong number: leave them out of every lead count and list"
+              className="text-[11px] text-gray-400 hover:text-gray-600 disabled:opacity-50 dark:hover:text-gray-300"
+            >
+              Not a lead
+            </button>
+          </div>
         )}
       </td>
     </tr>
+  );
+}
+
+
+/**
+ * Where this lead is in the 5-touch follow-up, under their number: "Follow-up 2
+ * of 5 · Thu 10:00", with Stop, and the language it goes in (tap to switch).
+ * Nothing at all for a lead who never entered it.
+ */
+function FollowupLine({
+  lead,
+  busy,
+  onFollowup,
+}: {
+  lead: Lead;
+  busy: boolean;
+  onFollowup: (lead: Lead, action: "stop" | "resume" | { language: string | null }) => void;
+}) {
+  const followup = lead.followup;
+  const line = leadFollowupLine(followup);
+  if (!followup || !line) return null;
+  const running = followup.status === "active" || followup.status === "sending";
+  const byTeam = followup.status === "stopped" && followup.stop_reason === "stopped_by_agent";
+  const language = followup.language_override ?? followup.language;
+  const nextLanguage = language === "hi" ? "en_US" : "hi";
+  return (
+    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+      <span title={followup.last_error ?? undefined}>
+        {line}
+        {running && followup.last_error ? " · waiting" : ""}
+      </span>
+      {running ? (
+        <>
+          <button
+            type="button"
+            disabled={busy}
+            title={`Send the follow-ups in ${LANGUAGE_LABEL[nextLanguage]} instead`}
+            onClick={() => onFollowup(lead, { language: nextLanguage })}
+            className="text-gray-500 underline decoration-dotted hover:text-brand-600 disabled:opacity-50"
+          >
+            {LANGUAGE_LABEL[language ?? ""] ?? "Auto language"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            title="No more automatic follow-ups to this lead"
+            onClick={() => onFollowup(lead, "stop")}
+            className="font-medium text-gray-500 hover:text-error-600 disabled:opacity-50"
+          >
+            Stop
+          </button>
+        </>
+      ) : byTeam ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => onFollowup(lead, "resume")}
+          className="font-medium text-brand-600 hover:text-brand-700 disabled:opacity-50"
+        >
+          Resume
+        </button>
+      ) : null}
+    </p>
   );
 }

@@ -73,6 +73,7 @@ export default function QuickActions({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [warning, setWarning] = useState("");
 
   // Visit
   const [slots, setSlots] = useState<VisitSlot[]>([]);
@@ -139,7 +140,7 @@ export default function QuickActions({
     setBusy(true);
     setError("");
     try {
-      await createVisit({
+      const booked = await createVisit({
         customer_phone: phone,
         customer_name: profile.name,
         slot_id: slotId,
@@ -150,6 +151,9 @@ export default function QuickActions({
       });
       const label = slots.find((slot) => slot.slot_id === slotId)?.label ?? "the chosen time";
       setNotes("");
+      // e.g. no location pin on the property: the reminder will hold until one
+      // is added, so the person booking has to hear it now, not on Site Visits.
+      setWarning(booked?.warnings?.length ? booked.warnings.join(" ") : "");
       done(`Visit booked for ${label}.`);
     } catch (err) {
       // Taken since the list loaded: say so and show what is free now.
@@ -408,6 +412,14 @@ export default function QuickActions({
 
       {error ? <p className="mt-2 text-xs text-error-500">{error}</p> : null}
       {notice ? <p className="mt-2 text-xs text-success-600">{notice}</p> : null}
+      {warning ? (
+        <p className="mt-1 flex items-start justify-between gap-2 rounded-lg bg-warning-50 px-2.5 py-1.5 text-xs text-warning-700 dark:bg-warning-500/15 dark:text-orange-400">
+          <span>{warning}</span>
+          <button type="button" onClick={() => setWarning("")} className="shrink-0 font-medium underline">
+            Dismiss
+          </button>
+        </p>
+      ) : null}
     </div>
   );
 }

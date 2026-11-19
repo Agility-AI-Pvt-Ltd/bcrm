@@ -106,10 +106,24 @@ export function isPropertyView(value: string | null): value is PropertyView {
   );
 }
 
-export async function listProperties(page = 1, pageSize = 50) {
-  return apiFetch<PageResult<PropertyRecord>>(
-    `/api/v1/properties?page=${page}&page_size=${pageSize}`,
-  );
+/** The Properties page's search box and filters. Blank fields are left out. */
+export type PropertyFilters = {
+  search?: string;
+  /** "rent" or "sale". */
+  listingType?: string;
+  /** Bedrooms, e.g. "2". */
+  bhk?: string;
+  /** Ceiling in rupees: monthly rent for rentals, price for sales. */
+  maxBudget?: number;
+};
+
+export async function listProperties(page = 1, pageSize = 50, filters: PropertyFilters = {}) {
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  if (filters.search?.trim()) params.set("search", filters.search.trim());
+  if (filters.listingType) params.set("listing_type", filters.listingType);
+  if (filters.bhk) params.set("bhk", filters.bhk);
+  if (filters.maxBudget && filters.maxBudget > 0) params.set("max_budget", String(filters.maxBudget));
+  return apiFetch<PageResult<PropertyRecord>>(`/api/v1/properties?${params}`);
 }
 
 /**

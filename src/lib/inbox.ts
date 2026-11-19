@@ -508,13 +508,13 @@ export async function createGroup(params: {
 // Presentation helpers
 // ---------------------------------------------------------------------------
 
-/** Which band a score sits in, or null when the customer was never assessed. */
-export function interestBand(score: number | null | undefined): InterestBand | null {
-  if (score === null || score === undefined || Number.isNaN(score)) return null;
-  if (score >= 61) return "hot";
-  if (score >= 41) return "warm";
-  if (score >= 21) return "cool";
-  return "cold";
+/**
+ * The band for a score comes from the server (`interest_band` on every lead and
+ * thread), never from thresholds repeated here: one definition, in
+ * `inbox_policy.interest_band`, for Home, Messages and the digest (P1-1).
+ */
+export function knownBand(band: string | null | undefined): InterestBand | null {
+  return band === "hot" || band === "warm" || band === "cool" || band === "cold" ? band : null;
 }
 
 export function bandBadgeColor(
@@ -535,10 +535,13 @@ export function bandBadgeColor(
 }
 
 /** The score as a sentence. Never invents a number for an unscored customer. */
-export function interestLabel(score: number | null | undefined): string {
-  const band = interestBand(score ?? null);
-  if (!band) return "Not scored yet";
-  return `${BAND_LABELS[band]} · ${score}/100`;
+export function interestLabel(
+  score: number | null | undefined,
+  band: string | null | undefined,
+): string {
+  const known = knownBand(band);
+  if (!known || score === null || score === undefined) return "Not scored yet";
+  return `${BAND_LABELS[known]} · ${score}/100`;
 }
 
 export function conversationStatusLabel(status: string): string {

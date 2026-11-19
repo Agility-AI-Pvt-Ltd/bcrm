@@ -280,6 +280,12 @@ export default function Calendar() {
             slotMinTime="07:00:00"
             slotMaxTime="22:00:00"
             firstDay={1}
+            // Indian dates ("Mon 9 Nov"), not the US default ("MON 11/9").
+            locale="en-GB"
+            dayHeaderFormat={{ weekday: "short", day: "numeric", month: "short" }}
+            // A visit always has a time; the empty all-day row only showed up as
+            // an unlabelled grey block on today's column.
+            allDaySlot={false}
             datesSet={(arg: DatesSetArg) => setRange({ start: arg.start, end: arg.end })}
             eventTimeFormat={{ hour: "numeric", minute: "2-digit", meridiem: "short" }}
           />

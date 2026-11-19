@@ -10,6 +10,7 @@ import {
   clickNotification,
   getUnreadCount,
   listNotifications,
+  UNREAD_CHANGED,
   type OrgNotification,
 } from "@/lib/notifications";
 
@@ -47,7 +48,12 @@ export default function NotificationDropdown() {
     const timer = window.setInterval(() => {
       void refreshCount();
     }, POLL_MS);
-    return () => window.clearInterval(timer);
+    const onChanged = (event: Event) => setUnread((event as CustomEvent<number>).detail);
+    window.addEventListener(UNREAD_CHANGED, onChanged);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(UNREAD_CHANGED, onChanged);
+    };
   }, [refreshCount]);
 
   const toggleDropdown = () => {
