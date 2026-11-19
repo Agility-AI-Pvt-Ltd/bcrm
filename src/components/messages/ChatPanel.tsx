@@ -152,7 +152,7 @@ export default function ChatPanel({
             <Badge color="light" size="sm">
               <span className="flex items-center gap-1.5 font-medium">
                 <Dot className={dotFor(thread.interest_band)} />
-                {interestLabel(thread.interest_score)}
+                {interestLabel(thread.interest_score, thread.interest_band)}
               </span>
             </Badge>
 

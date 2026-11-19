@@ -244,6 +244,8 @@ export type Lead = {
   /** Marked "Not a lead" (a broker, vendor, wrong number). Only set in that list. */
   not_a_lead?: boolean;
   not_lead_reason?: string | null;
+  /** Hot / warm / cool / cold from the server's one definition; null = not scored. */
+  interest_band?: string | null;
   /** Where they are in the 5-touch follow-up; absent when they never entered it. */
   followup?: LeadFollowup | null;
   preferred_location: string | null;

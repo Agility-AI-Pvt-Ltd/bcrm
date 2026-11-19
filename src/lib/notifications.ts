@@ -16,7 +16,9 @@ export type NotificationKind =
   | "visit_booked"
   | "callback_requested"
   | "reply_failed"
-  | "connection_lost";
+  | "connection_lost"
+  | "portal_lead"
+  | "job_failed";
 
 export type OrgNotification = {
   id: string;
@@ -119,7 +121,9 @@ export function statusDotClass(item: OrgNotification): string {
     return item.kind === "callback_requested" ||
       item.kind === "visit_booked" ||
       item.kind === "reply_failed" ||
-      item.kind === "connection_lost"
+      item.kind === "connection_lost" ||
+      item.kind === "portal_lead" ||
+      item.kind === "job_failed"
       ? "bg-error-500"
       : "bg-success-500";
   }

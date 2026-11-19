@@ -58,7 +58,7 @@ import {
   BAND_LABELS,
   INTEREST_BANDS,
   bandBadgeColor,
-  interestBand,
+  knownBand,
   interestLabel,
 } from "@/lib/inbox";
 import {
@@ -363,10 +363,11 @@ export default function LeadsPage() {
   const stats = useMemo(() => {
     const values = snapshot?.counts ?? {};
     const leads = values.replied ?? 0;
-    // Replies out of people actually messaged; every contact in the list
-    // (most never messaged) made this read near 0% or, filtered, near 100%.
-    const contacted = values.contacted ?? values.total ?? 0;
-    const rate = contacted ? Math.round((leads / contacted) * 100) : null;
+    // A cohort: of the people first messaged in this period, how many replied
+    // (P1-4). People who wrote to us first are not outreach and are left out.
+    const sent = values.outreach_sent ?? 0;
+    const answered = values.outreach_replied ?? 0;
+    const rate = sent ? Math.round((answered / sent) * 100) : null;
     return [
       {
         key: "leads" as const,
@@ -395,7 +396,10 @@ export default function LeadsPage() {
         key: null,
         value: rate === null ? "—" : `${rate}%`,
         label: "Reply rate",
-        hint: rate === null ? "Nothing sent in this period" : `${leads} of ${contacted} messaged answered`,
+        hint:
+          rate === null
+            ? "Nobody was first messaged in this period"
+            : `${answered} of ${sent} people messaged in this period replied`,
         activeHint: "",
       },
     ];
@@ -1028,8 +1032,8 @@ function whatsappHref(phone: string | null) {
 }
 
 /** The LLM's 0–100 interest read. Null means never scored, not zero. */
-function LeadScore({ score }: { score: number | null }) {
-  const band = interestBand(score);
+function LeadScore({ score, band: rawBand }: { score: number | null; band?: string | null }) {
+  const band = knownBand(rawBand);
   if (score === null || band === null) {
     return (
       <span className="text-gray-400" title="Not scored yet">
@@ -1038,7 +1042,7 @@ function LeadScore({ score }: { score: number | null }) {
     );
   }
   return (
-    <span title={interestLabel(score)}>
+    <span title={interestLabel(score, band)}>
       <Badge color={bandBadgeColor(band)} size="sm">
         {/* The word first: it is what an agent acts on; the number is detail. */}
         {BAND_LABELS[band]} · {score}
@@ -1159,7 +1163,7 @@ function LeadRow({
         ) : null}
       </td>
       <td className="px-5 py-3">
-        <LeadScore score={lead.intent_score} />
+        <LeadScore score={lead.intent_score} band={lead.interest_band} />
       </td>
       <td className="hidden px-5 py-3 min-[1320px]:table-cell">
         <div className="flex items-center gap-2">

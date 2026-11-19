@@ -28,7 +28,7 @@ import { useCallback, useEffect, useState } from "react";
 import CustomerProfileDrawer from "@/components/campaigns/CustomerProfileDrawer";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
-import { bandBadgeColor, interestBand, interestLabel } from "@/lib/inbox";
+import { bandBadgeColor, interestLabel, knownBand } from "@/lib/inbox";
 import {
   formatSince,
   formatWhen,
@@ -151,13 +151,13 @@ function filterFor(key: TileKey) {
   }
 }
 
-function Score({ score }: { score: number | null }) {
-  const band = interestBand(score);
+function Score({ score, band: rawBand }: { score: number | null; band?: string | null }) {
+  const band = knownBand(rawBand);
   if (score === null || band === null) {
     return <span className="text-gray-400">—</span>;
   }
   return (
-    <span title={interestLabel(score)}>
+    <span title={interestLabel(score, band)}>
       <Badge color={bandBadgeColor(band)} size="sm">
         {score}
       </Badge>
@@ -425,7 +425,7 @@ function DetailRow({
 
       <div className="flex items-center gap-2 sm:justify-end">
         {tile === "visits" ? null : (
-          <Score score={lead.intent_score} />
+          <Score score={lead.intent_score} band={lead.interest_band} />
         )}
         {(tile === "waiting" && lead.callback_requested_at) ||
         (tile === "needs_call" && lead.needs_call) ? (
