@@ -23,7 +23,7 @@ export default function AgentRouteGuard({ children }: { children: React.ReactNod
         </p>
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
           You can use Home, Messages, Properties, Site Visits, Daily Digest, Visit calendar,
-          Notifications and your profile.
+          Notifications, WhatsApp Templates and your profile.
         </p>
         <Link
           href="/leads"

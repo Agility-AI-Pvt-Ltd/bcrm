@@ -11,6 +11,7 @@
 
 import { useCallback, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import FollowupSequenceCard from "@/components/outreach/FollowupSequenceCard";
 import OfficeShiftCard from "@/components/outreach/OfficeShiftCard";
 
 export default function FollowUpsPage() {
@@ -21,9 +22,11 @@ export default function FollowUpsPage() {
     <div>
       <PageBreadcrumb pageTitle="Follow-ups" />
 
+      <FollowupSequenceCard />
+
       <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] lg:p-6">
         <h2 className="font-semibold text-gray-900 dark:text-white/90">
-          Keeping leads warm
+          The AI&apos;s follow-up shift
         </h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
           Every few hours the AI looks for leads who have gone quiet and writes
@@ -39,7 +42,8 @@ export default function FollowUpsPage() {
         </ul>
         <p className="mt-3 text-xs text-gray-400">
           Campaign sending lives on the Outreach page. This shift never sends a
-          campaign.
+          campaign. While the 5-touch follow-up is on, leads who messaged you
+          are followed up by it instead of by this shift.
         </p>
       </div>
 
