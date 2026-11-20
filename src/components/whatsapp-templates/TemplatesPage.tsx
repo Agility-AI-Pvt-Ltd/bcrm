@@ -411,7 +411,9 @@ function languageLabel(code: string): string {
 /** Which set of the library a starter belongs to, from its name. */
 function libraryGroupKey(entry: CatalogTemplate): string {
   if (entry.name.startsWith("followup_touch_")) return "followup";
-  if (entry.name === "daily_digest" || entry.name === "ai_call_scheduled") return "team";
+  // The morning digest (with or without buttons) and the AI-call alert go to
+  // agents' own numbers, not to customers.
+  if (entry.name.startsWith("daily_digest") || entry.name === "ai_call_scheduled") return "team";
   return "customers";
 }
 
@@ -430,7 +432,8 @@ const LIBRARY_GROUPS: Array<{ key: string; title: string; blurb: string }> = [
   {
     key: "team",
     title: "Messages to your team",
-    blurb: "Go to your agents' own WhatsApp numbers, not to customers.",
+    blurb:
+      "Go to your agents' own WhatsApp numbers, not to customers. daily_digest_actions is the morning digest with three buttons (New leads, Calls waiting, Site visits), so agents tap instead of typing \"hi\".",
   },
 ];
 
