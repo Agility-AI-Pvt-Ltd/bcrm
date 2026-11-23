@@ -93,15 +93,6 @@ const navItems: NavItem[] = [
     name: "Notifications",
     path: "/notifications",
   },
-  {
-    icon: <ShootingStarIcon />,
-    name: "Campaign Studio",
-    subItems: [
-      { name: "WhatsApp Outreach", path: "/outreach", pro: false, new: true },
-      { name: "Campaigns", path: "/campaigns", pro: false },
-      { name: "Contacts", path: "/contacts", pro: false },
-    ],
-  },
   // Not a campaign step either: a lead can go quiet weeks after the campaign
   // that first messaged it finished, and still needs following up. It runs on
   // its own schedule, so it gets its own entry rather than living under
@@ -110,6 +101,15 @@ const navItems: NavItem[] = [
     icon: <TimeIcon />,
     name: "Follow-ups",
     path: "/follow-ups",
+  },
+  {
+    icon: <ShootingStarIcon />,
+    name: "Campaign Studio",
+    subItems: [
+      { name: "WhatsApp Outreach", path: "/outreach", pro: false, new: true },
+      { name: "Campaigns", path: "/campaigns", pro: false },
+      { name: "Contacts", path: "/contacts", pro: false },
+    ],
   },
   // The one outbound AI call left: phoning WhatsApp enquiries that went quiet.
   // Top-level rather than inside Campaign Studio or the profile menu, because it
