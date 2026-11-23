@@ -33,7 +33,7 @@
  * callback and the customer says yes, the backend writes a `callback_requests`
  * row and stamps `callback_requested_at` on the contact. Those leads are sorted
  * above everyone else (oldest wait first, decided server-side), carry an amber
- * marker, and stay there until a human presses "Mark called". Nothing clears them
+ * marker, and stay there until a human logs the call. Nothing clears them
  * automatically — the flag stands for a promise made to a person, so only a
  * person can say it was kept. That queue is also the one thing the period does
  * not touch: somebody still owed a call stays listed whatever window is chosen,
@@ -45,6 +45,10 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import CustomerProfileDrawer from "@/components/campaigns/CustomerProfileDrawer";
 import LeadTileDetails from "@/components/campaigns/LeadTileDetails";
 import ResponseTimeCard from "@/components/campaigns/ResponseTimeCard";
+import CallOutcomePicker, {
+  LastCallLine,
+  type CallLogInput,
+} from "@/components/campaigns/CallOutcomePicker";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
 import {
@@ -70,7 +74,7 @@ import {
   formatWhen,
   getPipeline,
   listLeads,
-  markCallbackCalled,
+  logCallOutcome,
   markNotLead,
   NOT_LEAD_REASONS,
   unmarkNotLead,
@@ -224,29 +228,24 @@ export default function LeadsPage() {
   }, [loadSnapshot, loadLeads]);
 
   /**
-   * "I called them." Closes every open request for this lead and refreshes both
-   * the totals and the page, so the row leaves the top of the list immediately.
-   *
-   * `marked: 0` is not an error — it means the request was already closed, most
-   * likely by a colleague looking at the same screen. Say so plainly instead of
-   * showing a failure for something that ended in the right state.
+   * "Log call": what happened when they phoned this lead. The server does what
+   * the outcome means (off the list, stays on it, back at a time, follow-ups
+   * stopped, not a lead) and words the notice; the page refreshes so the row
+   * and the tiles move at once. Returns whether it saved, so the picker closes.
    */
-  const markCalled = useCallback(
-    async (lead: Lead) => {
-      const who = lead.name || "This lead";
+  const logCall = useCallback(
+    async (lead: Lead, input: CallLogInput) => {
       setMarkingId(lead.id);
       try {
-        const result = await markCallbackCalled(lead.id);
-        setNotice(
-          result.marked
-            ? `${who} is off the call list.`
-            : `${who} was already marked as called.`,
-        );
+        const result = await logCallOutcome(lead.id, input);
+        setNotice(result.message);
         reload();
+        return true;
       } catch (error) {
         setNotice(
           error instanceof ApiError ? error.message : "Could not save that call.",
         );
+        return false;
       } finally {
         setMarkingId("");
       }
@@ -680,7 +679,7 @@ export default function LeadsPage() {
           periodLabel={periodLabel}
           refreshKey={detailsVersion}
           marking={markingId}
-          onMarkCalled={markCalled}
+          onLogCall={logCall}
           onShowInTable={showInTable}
           onClose={() => setOpenTile(null)}
         />
@@ -964,7 +963,7 @@ export default function LeadsPage() {
                     key={lead.id}
                     lead={lead}
                     marking={markingId === lead.id}
-                    onMarkCalled={markCalled}
+                    onLogCall={logCall}
                     onNotLead={setNotLead}
                     onFollowup={changeFollowup}
                     onOpen={setProfileOf}
@@ -1058,14 +1057,14 @@ function LeadScore({ score, band: rawBand }: { score: number | null; band?: stri
 function LeadRow({
   lead,
   marking,
-  onMarkCalled,
+  onLogCall,
   onNotLead,
   onFollowup,
   onOpen,
 }: {
   lead: Lead;
   marking: boolean;
-  onMarkCalled: (lead: Lead) => void;
+  onLogCall: (lead: Lead, input: CallLogInput) => Promise<boolean>;
   /** Mark with a reason, or `null` to make them a lead again. */
   onNotLead: (lead: Lead, reason: string | null) => void;
   onFollowup: (lead: Lead, action: "stop" | "resume" | { language: string | null }) => void;
@@ -1134,6 +1133,7 @@ function LeadRow({
             Needs a call · replied {formatSince(lead.last_reply_at)}
           </p>
         ) : null}
+        <LastCallLine call={lead.last_call} since={formatSince} />
         <FollowupLine lead={lead} busy={marking} onFollowup={onFollowup} />
       </td>
       <td className="px-5 py-3">
@@ -1249,17 +1249,14 @@ function LeadRow({
           </div>
         ) : (
           <div className="flex flex-col items-start gap-1.5">
-            {waitingSince || uncalled ? (
-              <button
-                type="button"
-                disabled={marking}
-                onClick={() => onMarkCalled(lead)}
-                title="Record that you phoned them and take them off the call list"
-                className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
-              >
-                {marking ? "Saving…" : "Mark called"}
-              </button>
-            ) : null}
+            {/* Every lead, not only those on the call list: an agent phones
+                warm leads too, and what happened is worth keeping. */}
+            <CallOutcomePicker
+              lead={lead}
+              busy={marking}
+              urgent={Boolean(waitingSince || uncalled)}
+              onLog={onLogCall}
+            />
             <button
               type="button"
               disabled={marking}
