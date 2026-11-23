@@ -44,6 +44,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import CustomerProfileDrawer from "@/components/campaigns/CustomerProfileDrawer";
 import LeadTileDetails from "@/components/campaigns/LeadTileDetails";
+import ResponseTimeCard from "@/components/campaigns/ResponseTimeCard";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
 import {
@@ -684,6 +685,9 @@ export default function LeadsPage() {
           onClose={() => setOpenTile(null)}
         />
       ) : null}
+
+      {/* Speed to lead: how fast new enquiries hear back, by source and agent. */}
+      <ResponseTimeCard />
 
       {/* Interest, counted by the same function as Messages' "Hot" over every
           lead who replied, so the two screens show the same number. Whatever
