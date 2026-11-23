@@ -65,11 +65,9 @@ export const AGENT_PATHS = [
   // WhatsApp Business account, so nobody else can do it for them.
   "/whatsapp-templates",
   "/profile",
-  // Flow voice (vc_v1) is listed so the API alone decides who may use it: it
-  // answers "not open to agency users yet" until VC_V1_AGENTS_ALLOWED, and the
-  // sidebar hides the entry until it says yes. Opening it to agents is then a
-  // server setting, not a release.
-  "/voice-flow",
+  // Not "/voice-flow": Flow voice (vc_v1) is still in testing and is for
+  // developer sessions only. The sidebar hides it and a typed URL shows the
+  // "not available" panel to everyone else.
 ] as const;
 
 const ALWAYS_OPEN = ["/plans"];

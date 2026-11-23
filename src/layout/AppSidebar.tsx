@@ -24,7 +24,6 @@ import {
   UserCircleIcon,
 } from "../icons/index";
 import { useStoredUser } from "@/hooks/useStoredUser";
-import { useVoiceFlowStatus } from "@/hooks/useVoiceFlowStatus";
 import { canOpen, isAwaitingVerification, NOT_AVAILABLE_HINT } from "@/lib/access";
 
 type NavItem = {
@@ -33,7 +32,7 @@ type NavItem = {
   path?: string;
   new?: boolean;
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
-  /** Shown only when the API says this session may use the feature. */
+  /** Shown only in a developer session. */
   feature?: "vc_v1";
 };
 
@@ -121,8 +120,8 @@ const navItems: NavItem[] = [
     path: "/ai-callback",
   },
   // Flow voice (vc_v1): the prerecorded, flow-based agent, beside AI Callback
-  // rather than inside it, because it is a different agent. Hidden, not faded,
-  // until the API allows it: it is in testing and most accounts never see it.
+  // rather than inside it, because it is a different agent. Developers only:
+  // it is in testing, so agents never see the entry at all (hidden, not faded).
   {
     icon: <AudioIcon />,
     name: "Flow Voice",
@@ -181,10 +180,10 @@ const AppSidebar: React.FC = () => {
   const pathname = usePathname();
   const storedUser = useStoredUser();
   const awaitingVerification = isAwaitingVerification(storedUser);
-  const voiceFlow = useVoiceFlowStatus(storedUser !== null);
+  const developer = Boolean(storedUser?.acting_developer);
   const visibleItems = useMemo(
-    () => navItems.filter((nav) => nav.feature !== "vc_v1" || voiceFlow?.available),
-    [voiceFlow],
+    () => navItems.filter((nav) => nav.feature !== "vc_v1" || developer),
+    [developer],
   );
   // Sections an agent does not have stay in the menu, faded, and do not open.
   const locked = useCallback(
