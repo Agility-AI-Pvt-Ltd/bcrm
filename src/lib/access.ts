@@ -58,6 +58,9 @@ export const AGENT_PATHS = [
   "/daily-digest",
   "/calendar",
   "/notifications",
+  // Agents chase their own quiet leads: they see who is mid-sequence, stop or
+  // resume one, and switch a lead's language, so the page is theirs to open.
+  "/follow-ups",
   // Each agency submits its own templates from the library: approval is per
   // WhatsApp Business account, so nobody else can do it for them.
   "/whatsapp-templates",
