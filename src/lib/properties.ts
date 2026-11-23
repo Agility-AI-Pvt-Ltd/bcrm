@@ -45,6 +45,10 @@ export type PropertyRecord = {
   maintenance_monthly: string | number | null;
   /** One-time charges on a sale: {"Covered parking": "300000"}. */
   other_charges: Record<string, string>;
+  /** The listing's exact pin: the source of truth for every distance quoted. */
+  latitude?: number | null;
+  longitude?: number | null;
+  map_url?: string | null;
   /** "sheet" for listings mirrored from a connected spreadsheet. */
   source: "manual" | "sheet" | "import" | string;
   sheet_connection_id: string | null;
@@ -489,3 +493,18 @@ export function moneyLabel(value: string | number | null | undefined): string {
 function trimZeros(value: number): string {
   return String(Math.round(value * 100) / 100);
 }
+
+/**
+ * Set or clear a listing's pin: both numbers, or a Google Maps link that contains
+ * them. Both null clears it.
+ */
+export async function setPropertyPin(
+  propertyId: string,
+  pin: { latitude?: number | null; longitude?: number | null; map_url?: string | null },
+) {
+  return apiFetch<PropertyRecord>(`/api/v1/properties/${encodeURIComponent(propertyId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(pin),
+  });
+}
+
