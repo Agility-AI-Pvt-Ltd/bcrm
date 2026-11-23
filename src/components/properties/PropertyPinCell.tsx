@@ -37,11 +37,8 @@ export default function PropertyPinCell({
     }
     setBusy(true);
     try {
+      // The server refuses a link with no coordinates in it and says why.
       const updated = await setPropertyPin(property.id, body);
-      if (updated.latitude == null) {
-        setError("That link has no coordinates in it (short maps.app.goo.gl links don't). Open it and copy the full link, or type the numbers.");
-        return;
-      }
       onSaved(updated);
       setOpen(false);
     } catch (err) {

@@ -104,6 +104,8 @@ export default function LandmarksPanel() {
   };
 
   const remove = async (row: Landmark) => {
+    // Once removed, the assistant can no longer measure distances to it.
+    if (!window.confirm(`Remove ${row.name}? The assistant won't be able to measure distances to it.`)) return;
     setBusy(true);
     try {
       await deleteLandmark(row.id);
@@ -125,6 +127,18 @@ export default function LandmarksPanel() {
           that isn&apos;t on this list, or a listing with no pin, gets an honest &quot;I don&apos;t have
           that&quot;, never a guess.
         </p>
+        {/* Mirrors WALKING_KM / NEAR_KM / SHORT_DRIVE_KM in
+            bcrm-backend app/modules/properties/proximity.py. */}
+        <div className="mt-3 max-w-3xl rounded-lg bg-gray-50 p-3 text-xs text-gray-600 dark:bg-white/[0.04] dark:text-gray-300">
+          <p className="font-medium text-gray-700 dark:text-gray-200">How &quot;near&quot; is decided</p>
+          <p className="mt-1">
+            The assistant labels a place by its <strong>straight-line</strong> distance from the listing:
+            up to 1 km is &quot;walking distance&quot;, up to 3 km &quot;nearby&quot;, up to 7 km &quot;a
+            short drive&quot;, and beyond that &quot;not nearby&quot;. These are fixed distance bands,{" "}
+            <strong>not travel time</strong>: roads, traffic and the route aren&apos;t considered, so the real
+            journey is longer. Every reply says the distance is straight-line.
+          </p>
+        </div>
 
         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
           <input className={field} placeholder="Name, e.g. Atta Market" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
