@@ -20,15 +20,18 @@ import PropertyImportPanel from "@/components/campaigns/PropertyImportPanel";
 import PropertySheetsPanel from "@/components/campaigns/PropertySheetsPanel";
 import TrustSettingsCard from "@/components/properties/TrustSettingsCard";
 import PropertyIntakePanel from "@/components/properties/PropertyIntakePanel";
+import LandmarksPanel from "@/components/properties/LandmarksPanel";
+import PropertyPinCell from "@/components/properties/PropertyPinCell";
 
 const PAGE_SIZE = 10;
 
-type Tab = "inventory" | "add" | "settings";
+type Tab = "inventory" | "add" | "landmarks" | "settings";
 type Source = "whatsapp" | "sheets" | "upload";
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "inventory", label: "Inventory" },
   { id: "add", label: "Add listings" },
+  { id: "landmarks", label: "Landmarks" },
   { id: "settings", label: "Pricing & trust" },
 ];
 
@@ -337,6 +340,14 @@ export default function PropertiesPage() {
                       </td>
                       <td className="px-5 py-4 text-gray-500 dark:text-gray-400">
                         {property.location}
+                        <PropertyPinCell
+                          property={property}
+                          onSaved={(updated) =>
+                            setItems((current) =>
+                              current.map((item) => (item.id === updated.id ? updated : item)),
+                            )
+                          }
+                        />
                       </td>
                       <td className="whitespace-nowrap px-5 py-4 text-gray-500 dark:text-gray-400">
                         {property.bhk || property.property_type || "—"}
@@ -428,6 +439,15 @@ export default function PropertiesPage() {
         <div hidden={source !== "upload"}>
           <PropertyImportPanel onImported={load} />
         </div>
+      </div>
+
+      <div
+        role="tabpanel"
+        id="properties-panel-landmarks"
+        aria-labelledby="properties-tab-landmarks"
+        hidden={tab !== "landmarks"}
+      >
+        {tab === "landmarks" ? <LandmarksPanel /> : null}
       </div>
 
       <div
