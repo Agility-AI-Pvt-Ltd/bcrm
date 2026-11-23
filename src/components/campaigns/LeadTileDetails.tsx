@@ -26,6 +26,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import CustomerProfileDrawer from "@/components/campaigns/CustomerProfileDrawer";
+import CallOutcomePicker, { type CallLogInput } from "@/components/campaigns/CallOutcomePicker";
 import Badge from "@/components/ui/badge/Badge";
 import { ApiError } from "@/lib/api";
 import { bandBadgeColor, interestLabel, knownBand } from "@/lib/inbox";
@@ -171,7 +172,7 @@ export default function LeadTileDetails({
   periodLabel,
   refreshKey,
   marking,
-  onMarkCalled,
+  onLogCall,
   onShowInTable,
   onClose,
 }: {
@@ -181,7 +182,7 @@ export default function LeadTileDetails({
   /** Bumped by the page after a change (a lead marked called) to re-read. */
   refreshKey: number;
   marking: string;
-  onMarkCalled: (lead: Lead) => void;
+  onLogCall: (lead: Lead, input: CallLogInput) => Promise<boolean>;
   onShowInTable: (tile: TileKey) => void;
   onClose: () => void;
 }) {
@@ -285,7 +286,7 @@ export default function LeadTileDetails({
               lead={lead}
               visit={tile === "visits" ? (visits[lead.id] ?? null) : null}
               marking={marking === lead.id}
-              onMarkCalled={onMarkCalled}
+              onLogCall={onLogCall}
               onOpen={setProfileOf}
             />
           ))}
@@ -321,14 +322,14 @@ function DetailRow({
   lead,
   visit: entry,
   marking,
-  onMarkCalled,
+  onLogCall,
   onOpen,
 }: {
   tile: TileKey;
   lead: Lead;
   visit: ContactVisit | null;
   marking: boolean;
-  onMarkCalled: (lead: Lead) => void;
+  onLogCall: (lead: Lead, input: CallLogInput) => Promise<boolean>;
   /** Open this customer's profile (the Messages page's panel) in a drawer. */
   onOpen: (lead: Lead) => void;
 }) {
@@ -429,17 +430,7 @@ function DetailRow({
         )}
         {(tile === "waiting" && lead.callback_requested_at) ||
         (tile === "needs_call" && lead.needs_call) ? (
-          <button
-            type="button"
-            disabled={marking}
-            onClick={(event) => {
-              event.stopPropagation();
-              onMarkCalled(lead);
-            }}
-            className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-medium text-amber-700 transition hover:bg-amber-100 disabled:opacity-50 dark:border-amber-500/40 dark:text-amber-300 dark:hover:bg-amber-500/10"
-          >
-            {marking ? "Saving…" : "Mark called"}
-          </button>
+          <CallOutcomePicker lead={lead} busy={marking} urgent onLog={onLogCall} />
         ) : null}
       </div>
     </li>

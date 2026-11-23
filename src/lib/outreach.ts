@@ -208,6 +208,73 @@ export type RecipientPage = {
   offset: number;
 };
 
+/** The latest call someone on the team logged for a lead. */
+export type LastCall = {
+  outcome: CallOutcome;
+  label: string;
+  at: string | null;
+  by: string | null;
+  note: string | null;
+  /** "Didn't pick up" calls in a row since anything else happened. */
+  attempts: number;
+  /** When they come back onto the call list, if a call-back is planned. */
+  call_back_at: string | null;
+};
+
+export type CallOutcome =
+  | "interested"
+  | "not_picked"
+  | "call_back"
+  | "not_interested"
+  | "wrong_number";
+
+/** What each choice does, said on the button's tooltip. Order is the button order. */
+export const CALL_OUTCOMES: Array<{ value: CallOutcome; label: string; effect: string }> = [
+  { value: "interested", label: "Interested", effect: "Off the call list." },
+  {
+    value: "not_picked",
+    label: "Didn't pick up",
+    effect: "Stays on the call list, with the number of tries.",
+  },
+  {
+    value: "call_back",
+    label: "Call back later",
+    effect: "Off the list until the time you choose, then back with a WhatsApp reminder.",
+  },
+  {
+    value: "not_interested",
+    label: "Not interested",
+    effect: "Off the call list, and their automatic follow-ups stop.",
+  },
+  {
+    value: "wrong_number",
+    label: "Wrong number",
+    effect: "Marked Not a lead and left out of every count.",
+  },
+];
+
+export type CallOutcomeResult = {
+  contact_id: string;
+  outcome: CallOutcome;
+  label: string;
+  /** What happened, ready to show as the notice. */
+  message: string;
+  off_call_list: boolean;
+  call_back_at: string | null;
+  waiting_total: number;
+};
+
+/** Log what happened on a call. Each outcome does what it says (see CALL_OUTCOMES). */
+export async function logCallOutcome(
+  contactId: string,
+  body: { outcome: CallOutcome; note?: string | null; call_back_at?: string | null },
+) {
+  return apiFetch<CallOutcomeResult>(
+    `/api/v1/outreach/leads/${encodeURIComponent(contactId)}/call-outcome`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
 export type Lead = {
   id: string;
   name: string;
@@ -248,6 +315,8 @@ export type Lead = {
   interest_band?: string | null;
   /** Where they are in the 5-touch follow-up; absent when they never entered it. */
   followup?: LeadFollowup | null;
+  /** The latest call logged from Home; absent when nobody has logged one. */
+  last_call?: LastCall | null;
   preferred_location: string | null;
   bhk: string | null;
   budget_label: string | null;
