@@ -22,6 +22,7 @@ import TrustSettingsCard from "@/components/properties/TrustSettingsCard";
 import PropertyIntakePanel from "@/components/properties/PropertyIntakePanel";
 import LandmarksPanel from "@/components/properties/LandmarksPanel";
 import PropertyPinCell from "@/components/properties/PropertyPinCell";
+import PropertyPhotosManager from "@/components/properties/PropertyPhotosManager";
 
 const PAGE_SIZE = 10;
 
@@ -63,6 +64,7 @@ export default function PropertiesPage() {
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<Tab>("inventory");
+  const [photosFor, setPhotosFor] = useState<PropertyRecord | null>(null);
   const [source, setSource] = useState<Source>("whatsapp");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -335,7 +337,18 @@ export default function PropertiesPage() {
                           ) : (
                             <span className="h-10 w-14 shrink-0 rounded-md bg-gray-100 dark:bg-white/[0.06]" />
                           )}
-                          {property.title}
+                          <span>
+                            {property.title}
+                            <button
+                              type="button"
+                              onClick={() => setPhotosFor(property)}
+                              className="mt-0.5 block text-[11px] font-medium text-brand-600 hover:text-brand-700"
+                            >
+                              {property.image_urls?.length
+                                ? `📷 ${property.image_urls.length} photo${property.image_urls.length === 1 ? "" : "s"} · Manage`
+                                : "📷 Add photos"}
+                            </button>
+                          </span>
                         </span>
                       </td>
                       <td className="px-5 py-4 text-gray-500 dark:text-gray-400">
@@ -440,6 +453,19 @@ export default function PropertiesPage() {
           <PropertyImportPanel onImported={load} />
         </div>
       </div>
+
+      {photosFor ? (
+        <PropertyPhotosManager
+          propertyId={photosFor.id}
+          title={photosFor.title}
+          onClose={() => setPhotosFor(null)}
+          onChanged={(urls) =>
+            setItems((current) =>
+              current.map((item) => (item.id === photosFor.id ? { ...item, image_urls: urls } : item)),
+            )
+          }
+        />
+      ) : null}
 
       <div
         role="tabpanel"

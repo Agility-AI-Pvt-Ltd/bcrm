@@ -129,4 +129,51 @@ export async function apiFetch<T>(
   return payload?.data as T;
 }
 
+/**
+ * A multipart upload that reports progress, which `fetch` cannot do. Same
+ * headers, same envelope and the same errors as `apiFetch`, so callers treat
+ * both alike. `onProgress` gets 0–100.
+ */
+export function apiUpload<T>(
+  path: string,
+  body: FormData,
+  onProgress?: (percent: number) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE_URL}${path}`);
+    const token = readToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("X-Organization-Id", readOrgId());
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+    xhr.onerror = () => reject(new ApiError("The upload failed. Check your connection and try again.", 0));
+    xhr.onload = () => {
+      let payload: ApiEnvelope<T> | null = null;
+      try {
+        payload = JSON.parse(xhr.responseText) as ApiEnvelope<T>;
+      } catch {
+        payload = null;
+      }
+      if (xhr.status < 200 || xhr.status >= 300 || payload?.success === false) {
+        if (xhr.status === 403 && payload?.error?.code === "account_disabled") redirectToPlans();
+        reject(
+          new ApiError(
+            payload?.error?.message || `Upload failed (${xhr.status})`,
+            xhr.status,
+            payload?.error?.code,
+            payload?.error?.details,
+          ),
+        );
+        return;
+      }
+      resolve(payload?.data as T);
+    };
+    xhr.send(body);
+  });
+}
+
 export { API_BASE_URL, TOKEN_KEY, USER_KEY, ORG_KEY };
