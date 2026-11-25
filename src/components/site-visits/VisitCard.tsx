@@ -42,6 +42,17 @@ const input =
 const labelText = "text-xs font-medium text-gray-500 dark:text-gray-400";
 
 /** A labelled fact. The point of this screen is that nothing is hidden. */
+type VisitSection = "actions" | "slot" | "pin" | "feedback";
+
+/** Which part of the card does what a to-do asks. Words come from the server. */
+function sectionFor(todo: string): VisitSection {
+  const text = todo.toLowerCase();
+  if (text.includes("pin")) return "pin";
+  if (text.includes("slot")) return "slot";
+  if (text.includes("feedback")) return "feedback";
+  return "actions"; // confirm the visit, mark arrived or no-show
+}
+
 function Fact({
   label,
   value,
@@ -97,6 +108,8 @@ export default function VisitCard({
   onChanged: (next?: Visit) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // The to-do chip that was tapped: open the card and take them to that control.
+  const [jumpTo, setJumpTo] = useState<VisitSection | null>(null);
   const [detail, setDetail] = useState<VisitDetail | null>(null);
   // Loaded when the card opens rather than with the list: a page of twenty
   // cards does not need twenty copies of the team.
@@ -155,6 +168,19 @@ export default function VisitCard({
   }, [notice]);
 
   /** Run one action, then refresh this card and the list counts. */
+  useEffect(() => {
+    if (!open || !jumpTo) return;
+    const target = document.getElementById(`visit-${current.id}-${jumpTo}`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.querySelector<HTMLInputElement>("input, textarea")?.focus({ preventScroll: true });
+    const timer = setTimeout(() => setJumpTo(null), 1600);
+    return () => clearTimeout(timer);
+  }, [open, jumpTo, current.id]);
+
+  const sectionClass = (section: VisitSection) =>
+    jumpTo === section ? "ring-2 ring-brand-400 ring-offset-2 transition-shadow dark:ring-offset-gray-900" : "";
+
   const run = async (key: string, task: () => Promise<VisitDetail | void>, done?: string) => {
     setBusy(key);
     setError("");
@@ -258,11 +284,19 @@ export default function VisitCard({
       {current.view.outstanding.length && !current.needs_review ? (
         <ul className="mt-3 flex flex-wrap gap-2">
           {current.view.outstanding.map((item) => (
-            <li
-              key={item}
-              className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600 dark:bg-white/[0.06] dark:text-gray-300"
-            >
-              {item}
+            <li key={item}>
+              {/* Each to-do opens the card at the control that does it. They
+                  used to be plain labels that looked like buttons. */}
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(true);
+                  setJumpTo(sectionFor(item));
+                }}
+                className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-700 transition hover:bg-brand-50 hover:text-brand-700 dark:bg-white/[0.06] dark:text-gray-300 dark:hover:bg-brand-500/10"
+              >
+                {item} →
+              </button>
             </li>
           ))}
         </ul>
@@ -379,7 +413,7 @@ export default function VisitCard({
       {/* --- everything a broker can do about it -------------------------- */}
       {open ? (
         <div className="mt-4 space-y-4 border-t border-gray-100 pt-4 dark:border-gray-800">
-          <div className="flex flex-wrap gap-2">
+          <div id={`visit-${current.id}-actions`} className={`flex flex-wrap gap-2 rounded-xl ${sectionClass("actions")}`}>
             {current.status === "Requested" ? (
               <button
                 type="button"
@@ -517,7 +551,7 @@ export default function VisitCard({
           </div>
 
           {/* --- move it ------------------------------------------------- */}
-          <div className="rounded-xl border border-gray-100 p-3 dark:border-gray-800">
+          <div id={`visit-${current.id}-slot`} className={`rounded-xl border border-gray-100 p-3 dark:border-gray-800 ${sectionClass("slot")}`}>
             <p className={labelText}>Move to another slot</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <select
@@ -553,7 +587,7 @@ export default function VisitCard({
           </div>
 
           {/* --- the pin ------------------------------------------------- */}
-          <div className="rounded-xl border border-gray-100 p-3 dark:border-gray-800">
+          <div id={`visit-${current.id}-pin`} className={`rounded-xl border border-gray-100 p-3 dark:border-gray-800 ${sectionClass("pin")}`}>
             <p className={labelText}>Location pin</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <input
@@ -589,7 +623,7 @@ export default function VisitCard({
           </div>
 
           {/* --- feedback ------------------------------------------------ */}
-          <div className="rounded-xl border border-gray-100 p-3 dark:border-gray-800">
+          <div id={`visit-${current.id}-feedback`} className={`rounded-xl border border-gray-100 p-3 dark:border-gray-800 ${sectionClass("feedback")}`}>
             <p className={labelText}>Feedback after the visit</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               {[1, 2, 3, 4, 5].map((value) => (
