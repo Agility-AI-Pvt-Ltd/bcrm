@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch, apiUpload } from "@/lib/api";
 
 export type PropertyStatus = "Available" | "Reserved" | "Sold";
 export type PropertyListingType = "Sale" | "Rent";
@@ -506,5 +506,51 @@ export async function setPropertyPin(
     method: "PATCH",
     body: JSON.stringify(pin),
   });
+}
+
+/** One listing photo. The first is the cover shown on cards and sent first. */
+export type ListingPhoto = { url: string; thumbnail_url: string; cover: boolean };
+
+export type ListingPhotos = {
+  property_id: string;
+  photos: ListingPhoto[];
+  added?: { url: string; duplicate: boolean };
+};
+
+export function getPropertyPhotos(propertyId: string) {
+  return apiFetch<ListingPhotos>(`/api/v1/properties/${encodeURIComponent(propertyId)}/photos`);
+}
+
+/**
+ * Upload one photo (JPEG, PNG, WebP or HEIC). The server converts it to a
+ * WhatsApp-ready JPEG, shrinks it to fit and makes a thumbnail. One file per call
+ * so each can show its own progress and be retried on its own.
+ */
+export function uploadPropertyPhoto(
+  propertyId: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+) {
+  const body = new FormData();
+  body.append("file", file);
+  return apiUpload<ListingPhotos>(
+    `/api/v1/properties/${encodeURIComponent(propertyId)}/photos`,
+    body,
+    onProgress,
+  );
+}
+
+export function removePropertyPhoto(propertyId: string, url: string) {
+  return apiFetch<ListingPhotos>(
+    `/api/v1/properties/${encodeURIComponent(propertyId)}/photos?url=${encodeURIComponent(url)}`,
+    { method: "DELETE" },
+  );
+}
+
+export function reorderPropertyPhotos(propertyId: string, urls: string[]) {
+  return apiFetch<ListingPhotos>(
+    `/api/v1/properties/${encodeURIComponent(propertyId)}/photos/order`,
+    { method: "PUT", body: JSON.stringify({ urls }) },
+  );
 }
 
