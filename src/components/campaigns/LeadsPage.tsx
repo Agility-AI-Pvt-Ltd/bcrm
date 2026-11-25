@@ -685,9 +685,6 @@ export default function LeadsPage() {
         />
       ) : null}
 
-      {/* Speed to lead: how fast new enquiries hear back, by source and agent. */}
-      <ResponseTimeCard />
-
       {/* Interest, counted by the same function as Messages' "Hot" over every
           lead who replied, so the two screens show the same number. Whatever
           the period: a score is where a lead stands now. */}
@@ -998,6 +995,12 @@ export default function LeadsPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Speed to lead, at the bottom: a review of how the team is doing, read
+          after the day's work above it (who to call, who replied). */}
+      <div className="mt-6">
+        <ResponseTimeCard />
       </div>
 
       {profileOf ? (
