@@ -45,6 +45,8 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import CustomerProfileDrawer from "@/components/campaigns/CustomerProfileDrawer";
 import LeadTileDetails from "@/components/campaigns/LeadTileDetails";
 import ResponseTimeCard from "@/components/campaigns/ResponseTimeCard";
+import LeadSourcesCard from "@/components/campaigns/LeadSourcesCard";
+import RecentlyDeletedPanel from "@/components/campaigns/RecentlyDeletedPanel";
 import CallOutcomePicker, {
   LastCallLine,
   type CallLogInput,
@@ -999,9 +1001,15 @@ export default function LeadsPage() {
 
       {/* Speed to lead, at the bottom: a review of how the team is doing, read
           after the day's work above it (who to call, who replied). */}
+      {/* Is each lead source still sending leads? Red, amber or green per source. */}
+      <LeadSourcesCard />
+
       <div className="mt-6">
         <ResponseTimeCard />
       </div>
+
+      {/* A lead deleted by mistake comes back from here, whole. */}
+      <RecentlyDeletedPanel onRestored={reload} />
 
       {profileOf ? (
         <CustomerProfileDrawer
