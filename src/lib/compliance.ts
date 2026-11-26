@@ -116,9 +116,24 @@ export type NumberRefresh = {
   health: MessagingHealth;
 };
 
+/** Today's WhatsApp limit: different people messaged with a template in 24 h. */
+export type DailyLimit = {
+  limit: number | null;
+  used: number;
+  remaining: number | null;
+  /** What campaigns may still send now (a share is kept for reminders). */
+  allowed: number;
+  quality: string;
+  pace: number;
+  paused: boolean;
+  /** Why campaigns are slowed or held, in plain words. Empty when they are not. */
+  reason: string;
+};
+
 export type MessagingHealth = {
   spend: MessagingSpend;
   quality: NumberQuality;
+  daily_limit?: DailyLimit;
 };
 
 export type ComplianceOverview = {

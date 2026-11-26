@@ -3,6 +3,7 @@
 import { ChangeEvent, DragEvent, useCallback, useEffect, useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import ContactsAssistantChat from "@/components/campaigns/ContactsAssistantChat";
+import RecentlyDeletedPanel from "@/components/campaigns/RecentlyDeletedPanel";
 import Badge from "@/components/ui/badge/Badge";
 import { CheckCircleIcon, GroupIcon, ShootingStarIcon } from "@/icons";
 import { ApiError } from "@/lib/api";
@@ -1728,6 +1729,8 @@ export default function ContactsPage() {
           </section>
         </div>
       </div>
+
+      <RecentlyDeletedPanel />
 
       {notice && (
         <div

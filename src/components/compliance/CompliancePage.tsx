@@ -600,6 +600,33 @@ export default function CompliancePage() {
             which is worth doing if this has said “Not reported yet” for a while.
           </p>
 
+          {messaging.daily_limit ? (
+            <div className="mt-4 rounded-xl border border-gray-100 p-3 dark:border-gray-800">
+              <p className="text-sm font-medium text-gray-800 dark:text-white/90">Today&apos;s WhatsApp limit</p>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                {messaging.daily_limit.limit === null
+                  ? `No daily limit. ${messaging.daily_limit.used.toLocaleString("en-IN")} people messaged in the last 24 hours.`
+                  : `${messaging.daily_limit.used.toLocaleString("en-IN")} of ${messaging.daily_limit.limit.toLocaleString("en-IN")} people messaged in the last 24 hours. Campaigns can reach ${messaging.daily_limit.allowed.toLocaleString("en-IN")} more right now.`}
+              </p>
+              {messaging.daily_limit.limit !== null ? (
+                <div className="mt-2 h-2 w-full overflow-hidden rounded bg-gray-100 dark:bg-gray-800">
+                  <div
+                    className={`h-full ${messaging.daily_limit.paused || messaging.daily_limit.allowed === 0 ? "bg-error-500" : "bg-brand-500"}`}
+                    style={{ width: `${Math.min(100, Math.round((messaging.daily_limit.used / Math.max(1, messaging.daily_limit.limit)) * 100))}%` }}
+                  />
+                </div>
+              ) : null}
+              {messaging.daily_limit.reason ? (
+                <p className="mt-2 text-xs text-warning-700 dark:text-warning-500">{messaging.daily_limit.reason}</p>
+              ) : (
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  Meta limits how many different people you can start conversations with each day. Campaigns pause
+                  automatically near the limit, keeping room for reminders and follow-ups.
+                </p>
+              )}
+            </div>
+          ) : null}
+
           <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Figure label="Messages sent" value={messaging.spend.messages} />
             <Figure label="Spend" value={rupees(messaging.spend.spend)} />
