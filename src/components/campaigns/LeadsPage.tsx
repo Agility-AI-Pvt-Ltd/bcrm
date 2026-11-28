@@ -480,8 +480,11 @@ export default function LeadsPage() {
       {/* "Home" as in the menu: one name for one page. The list on it is leads. */}
       <PageBreadcrumb pageTitle="Home" />
 
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
+      {/* The buttons stay put whichever period is picked: the period sentence
+          sits under this row, not beside the buttons, where its extra line
+          used to push them onto a row of their own. */}
+      <div className="mb-2 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1 basis-80">
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white/90">
             {scope === "replied" ? "Everyone who wrote back" : "The whole pipeline"}
           </h1>
@@ -490,17 +493,8 @@ export default function LeadsPage() {
               ? "A real person replying on WhatsApp — even once — makes them a lead, and they are listed here separately from the rest of your contacts."
               : "Every contact across the six stages, including those who have not replied yet. The AI keeps following these up."}
           </p>
-          {period !== "all" ? (
-            // Said out loud, because every number below it changed when the
-            // button was pressed and a count with no stated window is a count
-            // somebody will read as the whole book of business.
-            <p className="mt-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-              {periodLabel} — counting everyone who last replied in this period.
-              Customers still waiting for a call are always shown.
-            </p>
-          ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           {/* The working window. First, because it is the control an agent
               reaches for every morning — and it moves the tiles as well as the
               list, so it belongs above both rather than inside the table. */}
@@ -561,6 +555,15 @@ export default function LeadsPage() {
           </button>
         </div>
       </div>
+      {/* Said out loud, because every number below it changed when the button
+          was pressed and a count with no stated window is a count somebody will
+          read as the whole book of business. Height kept for "All time" too, so
+          the tiles don't jump when the period changes. */}
+      <p className="mb-6 min-h-5 text-sm font-medium text-gray-700 dark:text-gray-200">
+        {period !== "all"
+          ? `${periodLabel} — counting everyone who last replied in this period. Customers still waiting for a call are always shown.`
+          : null}
+      </p>
 
       {/* Call now: the people owed a phone call, at the top because the next
           action is a call, not reading analytics. The counts follow below. */}
